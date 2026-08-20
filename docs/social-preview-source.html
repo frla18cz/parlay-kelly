@@ -111,6 +111,15 @@ ctx.fillStyle=C.muted; ctx.font='400 21px '+F;
 const tail='Analytic Kelly + Monte Carlo · zero dependencies · MIT';
 ctx.fillText(tail, W-PAD-ctx.measureText(tail).width, 582);
 
-window.__png = document.getElementById('c').toDataURL('image/png');
+const _c = document.getElementById('c');
+// Flatten onto an opaque canvas first: a JPEG has no alpha, and encoding
+// straight from an RGBA canvas is where colour surprises come from.
+const _f = document.createElement('canvas');
+_f.width = _c.width; _f.height = _c.height;
+const _fx = _f.getContext('2d');
+_fx.fillStyle = '#0d0d0d'; _fx.fillRect(0,0,_f.width,_f.height);
+_fx.drawImage(_c, 0, 0);
+window.__png  = _c.toDataURL('image/png');
+window.__jpeg = _f.toDataURL('image/jpeg', 0.94);
 document.title='card-ready';
 </script></body></html>
