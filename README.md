@@ -4,15 +4,9 @@
 
 **How much of your bankroll to put on a combo ticket — whether you are buying it or writing it.**
 
-[Live demo](https://frla18cz.github.io/parlay-kelly/) ·
-[Quickstart](#quickstart) ·
-[The maths](#the-maths) ·
-[Limits](#limits-and-assumptions)
+[Live demo](https://frla18cz.github.io/parlay-kelly/) &nbsp;·&nbsp; [Quickstart](#quickstart) &nbsp;·&nbsp; [The maths](#the-maths) &nbsp;·&nbsp; [Limits](#limits-and-assumptions)
 
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-![Zero dependencies](https://img.shields.io/badge/dependencies-none-brightgreen.svg)
-![Vanilla JS](https://img.shields.io/badge/vanilla-JS-f7df1e.svg)
-![Single file build](https://img.shields.io/badge/build-single%20file-lightgrey.svg)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) ![Zero dependencies](https://img.shields.io/badge/dependencies-none-brightgreen.svg) ![Vanilla JS](https://img.shields.io/badge/vanilla-JS-f7df1e.svg) ![Single file build](https://img.shields.io/badge/build-single%20file-lightgrey.svg)
 
 ![Flipping between selling and buying the same combo, then re-running the simulation](docs/demo.gif)
 
