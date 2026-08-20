@@ -1,8 +1,22 @@
+<div align="center">
+
 # Parlay Kelly
 
 **How much of your bankroll to put on a combo ticket — whether you are buying it or writing it.**
 
-![The single-ticket view](docs/screenshot-single-ticket.jpg)
+[Live demo](https://frla18cz.github.io/parlay-kelly/) ·
+[Quickstart](#quickstart) ·
+[The maths](#the-maths) ·
+[Limits](#limits-and-assumptions)
+
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+![Zero dependencies](https://img.shields.io/badge/dependencies-none-brightgreen.svg)
+![Vanilla JS](https://img.shields.io/badge/vanilla-JS-f7df1e.svg)
+![Single file build](https://img.shields.io/badge/build-single%20file-lightgrey.svg)
+
+![Flipping between selling and buying the same combo, then re-running the simulation](docs/demo.gif)
+
+</div>
 
 A parlay pays out only if every leg lands, so its fair price is the product of
 the leg prices. That much is easy. The hard question is the next one: given an
@@ -26,11 +40,12 @@ the combo or buying it?**
 | **Sell** — you write the ticket | the combo **misses** | `1 − c` per contract | `c` per contract |
 | **Buy** — you back the ticket | the combo **hits** | `c` per contract | `1 − c` per contract |
 
-The two are mirror images at the level of a single bet, but they are *not*
-interchangeable across a range of tickets — see [the asymmetry](#the-asymmetry-that-surprised-me)
-below. Every label, formula and chart in the app follows the side you pick, and
-results computed for one side are dimmed the moment you switch, so stale numbers
-can never be mistaken for current ones.
+> [!IMPORTANT]
+> The two sides are mirror images for a single bet, but they are **not**
+> interchangeable across a range of tickets — see [the asymmetry](#the-asymmetry-that-surprised-me).
+> Every label, formula and chart follows the side you pick, and results computed
+> for one side are dimmed the moment you switch, so stale numbers can never be
+> mistaken for current ones.
 
 ## Quickstart
 
@@ -46,8 +61,8 @@ Or build the single-file version and open it by double-clicking:
 python3 build.py            # → dist/parlay-kelly.html
 ```
 
-That file has no external requests at all — it works from `file://`, over email,
-or dropped onto any static host.
+That file makes no external requests at all — it works from `file://`, over
+email, or dropped onto any static host.
 
 ## What it shows
 
@@ -126,9 +141,10 @@ The app states which end of the band is winning rather than assuming, because
 getting this backwards is an expensive mistake and it is not obvious from
 either side.
 
-### Two different measures of decline
+<details>
+<summary><b>Two different measures of decline — and why they are not interchangeable</b></summary>
 
-Both are shown, and they are **not interchangeable**:
+<br>
 
 - **Max drawdown from a running peak** grows without bound as the series gets
   longer. It is the maximum of a reflected walk, which returns to zero infinitely
@@ -142,7 +158,15 @@ Both are shown, and they are **not interchangeable**:
 
 `kelly.js` → `drawdownProb()` computes the second. The first can only be simulated.
 
-### Concurrent tickets
+Both are shown in the app, side by side, precisely because quoting one while
+meaning the other is such a common way to be wrong about risk.
+
+</details>
+
+<details>
+<summary><b>Concurrent tickets — when splitting Kelly is right, and when it quietly costs you</b></summary>
+
+<br>
 
 For **independent** tickets, concurrency does not matter: ten at once behaves
 like ten in a row. The optimal fraction per ticket barely moves (3.846 % at one,
@@ -161,6 +185,8 @@ The textbook "2× Kelly = zero growth" holds exactly only for a symmetric bet
 (`winProb = 0.5`); with a skewed payout the point sits lower (~1.977× at
 `winProb = 0.9`), so it is solved numerically rather than hardcoded.
 
+</details>
+
 ## The engine
 
 Seeded mulberry32, fully reproducible. Runs in batches on the main thread — 100M
@@ -171,7 +197,10 @@ Memory is O(1) in the number of simulations: percentile bands come from a
 log-grid histogram (121 checkpoints × 2400 bins), and only the arrays of final
 bankrolls and max drawdowns, plus 200 sample paths, are kept exactly.
 
-## Verified
+<details>
+<summary><b>Verification — what was actually checked, and against what</b></summary>
+
+<br>
 
 - **Golden test** — legs 0.5/0.5, 4 % markup: `c = 0.26`, `f* = 3.846 %`,
   EV 0.01/contract; at a bankroll of 10,000 → max loss 384.62, 519.75 contracts,
@@ -189,7 +218,13 @@ bankrolls and max drawdowns, plus 200 sample paths, are kept exactly.
 - **Reproducibility** — the same seed gives a bit-for-bit identical result, and
   the replayed trade log reproduces its simulation's final bankroll exactly.
 
+</details>
+
 ## Limits and assumptions
+
+> [!WARNING]
+> This is a sizing and risk-visualisation tool. It is not betting advice, and it
+> has no way of knowing whether your edge is real.
 
 - **Legs are assumed independent.** The fair price is a plain product. Correlated
   legs (same match, same player, same weather) make the true probability higher
@@ -202,9 +237,6 @@ bankrolls and max drawdowns, plus 200 sample paths, are kept exactly.
   limits are not modelled.
 - **The probability estimate is yours.** Everything downstream is only as good
   as `p`, and result 3 above is about exactly how unforgiving that is.
-
-This is a sizing and risk-visualisation tool. It is not betting advice, and it
-does not know whether your edge is real.
 
 ## Layout
 
@@ -223,6 +255,7 @@ serve.py            static server
 
 MIT — see [LICENSE](LICENSE).
 
-Shared as-is, because it was useful to me and might be useful to you. I am not
-committing to maintain it, review pull requests, or answer issues; fork it freely
-if you want it to go somewhere I am not taking it.
+> [!NOTE]
+> Shared as-is, because it was useful to me and might be useful to you. I am not
+> committing to maintain it, review pull requests, or answer issues. Fork it
+> freely if you want it to go somewhere I am not taking it.
