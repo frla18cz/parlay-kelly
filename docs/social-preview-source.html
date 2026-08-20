@@ -1,0 +1,116 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+html,body{margin:0;background:#111;display:grid;place-items:center;height:100%}
+canvas{box-shadow:0 0 0 1px #333}
+</style></head><body>
+<canvas id="c" width="1280" height="640"></canvas>
+<script>
+const C = {
+  plane:'#0d0d0d', s1:'#1a1a19', grid:'#2c2c2a', axis:'#383835',
+  text:'#ffffff', sec:'#c3c2b7', muted:'#898781',
+  blue:'#3987e5', orange:'#d95926'
+};
+const ctx = document.getElementById('c').getContext('2d');
+const W=1280, H=640;
+
+// ---- background -----------------------------------------------------------
+ctx.fillStyle = C.plane; ctx.fillRect(0,0,W,H);
+
+// ---- decorative fan chart -------------------------------------------------
+// Lives in the empty region to the right of the title, clipped to its own box
+// and bleeding off the right edge. Kept well clear of every line of text.
+function mulberry32(a){return function(){a=(a+0x6D2B79F5)|0;var t=Math.imul(a^(a>>>15),1|a);
+  t=(t+Math.imul(t^(t>>>7),61|t))^t;return ((t^(t>>>14))>>>0)/4294967296;};}
+
+const BX0=828, BX1=W, BY0=64, BY1=376;
+const N=200, baseY=(BY0+BY1)/2 + 26, drift=-0.34;
+
+ctx.save();
+ctx.beginPath(); ctx.rect(BX0,BY0,BX1-BX0,BY1-BY0); ctx.clip();
+
+function band(spread, alpha){
+  const rng = mulberry32(7), up=[], dn=[];
+  for(let i=0;i<N;i++){
+    const t=i/(N-1);
+    const s = spread*Math.sqrt(t)*(BY1-BY0)*0.30;
+    const mid = baseY + drift*t*(BY1-BY0) + (rng()-0.5)*5;
+    up.push(mid-s); dn.push(mid+s);
+  }
+  ctx.beginPath();
+  for(let i=0;i<N;i++){const x=BX0+(i/(N-1))*(BX1-BX0); i?ctx.lineTo(x,up[i]):ctx.moveTo(x,up[i]);}
+  for(let i=N-1;i>=0;i--){const x=BX0+(i/(N-1))*(BX1-BX0); ctx.lineTo(x,dn[i]);}
+  ctx.closePath();
+  ctx.fillStyle=C.blue; ctx.globalAlpha=alpha; ctx.fill(); ctx.globalAlpha=1;
+}
+band(1.00, 0.16);
+band(0.55, 0.22);
+
+function line(col, d2, alpha){
+  const rng = mulberry32(19);
+  ctx.beginPath();
+  for(let i=0;i<N;i++){
+    const t=i/(N-1), x=BX0+t*(BX1-BX0);
+    const y = baseY + d2*t*(BY1-BY0) + (rng()-0.5)*6;
+    i?ctx.lineTo(x,y):ctx.moveTo(x,y);
+  }
+  ctx.strokeStyle=col; ctx.lineWidth=2.5; ctx.globalAlpha=alpha;
+  ctx.lineJoin='round'; ctx.stroke(); ctx.globalAlpha=1;
+}
+line(C.orange, drift*0.68, 0.80);
+line(C.blue,   drift*1.02, 0.90);
+
+// soften the left edge so it fades in rather than starting with a hard seam
+let fg = ctx.createLinearGradient(BX0,0,BX0+190,0);
+fg.addColorStop(0,'rgba(13,13,13,1)'); fg.addColorStop(1,'rgba(13,13,13,0)');
+ctx.fillStyle=fg; ctx.fillRect(BX0,BY0,190,BY1-BY0);
+// and the top/bottom edges
+let vg = ctx.createLinearGradient(0,BY0,0,BY0+70);
+vg.addColorStop(0,'rgba(13,13,13,1)'); vg.addColorStop(1,'rgba(13,13,13,0)');
+ctx.fillStyle=vg; ctx.fillRect(BX0,BY0,BX1-BX0,70);
+let vg2 = ctx.createLinearGradient(0,BY1-90,0,BY1);
+vg2.addColorStop(0,'rgba(13,13,13,0)'); vg2.addColorStop(1,'rgba(13,13,13,1)');
+ctx.fillStyle=vg2; ctx.fillRect(BX0,BY1-90,BX1-BX0,90);
+
+ctx.restore();
+
+// ---- text -----------------------------------------------------------------
+const F='system-ui,-apple-system,"Segoe UI",sans-serif';
+const M='ui-monospace,SFMono-Regular,Menlo,monospace';
+const PAD=84;
+
+ctx.textBaseline='alphabetic';
+
+// accent rule
+ctx.fillStyle=C.blue; ctx.fillRect(PAD,112,64,5);
+
+ctx.fillStyle=C.text; ctx.font='700 82px '+F;
+ctx.fillText('Parlay Kelly', PAD, 208);
+
+ctx.fillStyle=C.sec; ctx.font='400 30px '+F;
+ctx.fillText('How much of your bankroll to put on a combo ticket —', PAD, 262);
+ctx.fillText('whether you are buying it or writing it.', PAD, 303);
+
+// the hook: the two formulas that are not mirror images
+function chip(x,y,label,formula,accent){
+  ctx.font='500 17px '+F; ctx.fillStyle=C.muted;
+  ctx.fillText(label, x, y);
+  ctx.font='600 30px '+M; ctx.fillStyle=accent;
+  ctx.fillText(formula, x, y+40);
+  return ctx.measureText(formula).width;
+}
+chip(PAD, 396, 'SELLING, FIXED MARKUP', 'f* = m/(1+m)', C.blue);
+chip(PAD+372, 396, 'BUYING, FIXED DISCOUNT', 'f* = p·d/(1−p(1−d))', C.orange);
+
+ctx.fillStyle=C.muted; ctx.font='400 21px '+F;
+ctx.fillText('Not mirror images. One is constant across a band of tickets; the other is not.', PAD, 486);
+
+// footer
+ctx.fillStyle=C.axis; ctx.fillRect(PAD,540,W-PAD*2,1);
+ctx.fillStyle=C.sec; ctx.font='500 21px '+M;
+ctx.fillText('github.com/frla18cz/parlay-kelly', PAD, 582);
+ctx.fillStyle=C.muted; ctx.font='400 21px '+F;
+const tail='Analytic Kelly + Monte Carlo · zero dependencies · MIT';
+ctx.fillText(tail, W-PAD-ctx.measureText(tail).width, 582);
+
+window.__png = document.getElementById('c').toDataURL('image/png');
+document.title='card-ready';
+</script></body></html>
