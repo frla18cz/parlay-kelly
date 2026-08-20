@@ -1,0 +1,3650 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Parlay Kelly — bet sizing for combo tickets, either side of the trade</title>
+<meta name="theme-color" content="#0d0d0d">
+<style>
+/* styles.css — the design system.
+ *
+ * The chart colours are a validated reference palette and must NOT be
+ * changed: --surface-1 is the plotting surface the contrasts were verified
+ * against. Depth comes from layout and motion, never from off-palette hues.
+ */
+
+/* ---- tokens: dark (the base) ----------------------------------------- */
+:root {
+  color-scheme: dark;
+
+  --plane: #0d0d0d;
+  --surface-1: #1a1a19;
+  --surface-2: #222220;
+  --surface-3: #2a2a27;
+
+  --text-primary: #ffffff;
+  --text-secondary: #c3c2b7;
+  --text-muted: #898781;
+
+  --gridline: #2c2c2a;
+  --axis: #383835;
+  --border: rgba(255, 255, 255, 0.10);
+  --border-strong: rgba(255, 255, 255, 0.16);
+  --crosshair: #898781;
+  --spaghetti: #898781;
+
+  /* categorical slots — dark steps, checked by the palette validator */
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+  --series-5: #d55181;
+  --series-7: #9085e9;
+  --series-8: #e66767;
+
+  /* diverging pair plus a neutral midpoint */
+  --div-pos: #3987e5;
+  --div-neg: #e66767;
+  --div-mid: #383835;
+
+  /* state colours — never used as a data series */
+  --good: #0ca30c;
+  --warning: #fab219;
+  --serious: #ec835a;
+  --critical: #d03b3b;
+
+  --accent-glow: rgba(57, 135, 229, 0.20);
+  --radius: 14px;
+  --radius-sm: 9px;
+  --font: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+/* ---- tokens: light --------------------------------------------------- */
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --plane: #f9f9f7;
+  --surface-1: #fcfcfb;
+  --surface-2: #f3f2ef;
+  --surface-3: #eae9e4;
+
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #898781;
+
+  --gridline: #e1e0d9;
+  --axis: #c3c2b7;
+  --border: rgba(11, 11, 11, 0.10);
+  --border-strong: rgba(11, 11, 11, 0.16);
+
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+  --series-5: #e87ba4;
+  --series-7: #4a3aa7;
+  --series-8: #e34948;
+
+  --div-pos: #2a78d6;
+  --div-neg: #e34948;
+  --div-mid: #f0efec;
+
+  --good: #006300;
+  --accent-glow: rgba(42, 120, 214, 0.14);
+}
+
+/* ---- base ------------------------------------------------------------ */
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--plane);
+  color: var(--text-primary);
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+body::before {
+  /* a slight warming of the background — depth without extra hues */
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(1100px 600px at 12% -10%, var(--accent-glow), transparent 65%),
+    radial-gradient(900px 500px at 100% 0%, rgba(217, 89, 38, 0.07), transparent 60%);
+  z-index: 0;
+}
+
+.app { position: relative; z-index: 1; }
+
+h1, h2, h3 { margin: 0; font-weight: 600; letter-spacing: -0.01em; }
+a { color: var(--series-1); }
+
+/* ---- top bar --------------------------------------------------------- */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 12px 22px;
+  background: color-mix(in srgb, var(--plane) 82%, transparent);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--border);
+}
+
+.brand { display: flex; align-items: baseline; gap: 10px; margin-right: auto; }
+.brand h1 { font-size: 15px; }
+.brand .sub { font-size: 12px; color: var(--text-muted); }
+
+.tabs { display: flex; gap: 3px; padding: 3px; background: var(--surface-2); border-radius: 10px; }
+.tab {
+  appearance: none; border: 0; cursor: pointer;
+  padding: 7px 15px; border-radius: 8px;
+  background: transparent; color: var(--text-secondary);
+  font: inherit; font-size: 13px; font-weight: 500;
+  transition: background .15s, color .15s;
+}
+.tab:hover { color: var(--text-primary); }
+.tab[aria-selected="true"] { background: var(--surface-1); color: var(--text-primary); box-shadow: 0 1px 3px rgba(0,0,0,.28); }
+
+.icon-btn {
+  appearance: none; cursor: pointer;
+  width: 34px; height: 34px; border-radius: 9px;
+  border: 1px solid var(--border);
+  background: var(--surface-1); color: var(--text-secondary);
+  font-size: 15px; line-height: 1;
+  display: grid; place-items: center;
+}
+.icon-btn:hover { color: var(--text-primary); border-color: var(--border-strong); }
+/* the same chip, but it is a link, so it must not inherit the anchor colour */
+.repo-link { text-decoration: none; color: var(--text-secondary); }
+.repo-link:hover { color: var(--text-primary); }
+
+/* ---- perspective bar --------------------------------------------------
+ *
+ * The single most important control on the page: it decides whether every
+ * number below is computed from the seller's seat or the buyer's. It gets a
+ * full-width row of its own precisely so nobody can miss which side is live.
+ */
+.perspbar {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+  padding: 13px 22px;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+}
+.perspbar-lead { display: flex; flex-direction: column; gap: 3px; margin-right: auto; }
+.perspbar-q { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.perspbar-note { font-size: 12px; color: var(--text-secondary); }
+.perspbar-note strong { color: var(--text-primary); }
+
+.seg.persp { padding: 4px; background: var(--surface-1); }
+.seg.persp button {
+  display: flex; flex-direction: column; gap: 2px;
+  align-items: flex-start; text-align: left;
+  padding: 8px 15px; min-width: 178px;
+  white-space: normal; overflow: visible;
+}
+.seg.persp button[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--series-1) 16%, var(--surface-1));
+  box-shadow: inset 0 0 0 1px var(--series-1);
+}
+.seg.persp .pt { font-size: 13px; font-weight: 600; }
+.seg.persp button[aria-pressed="true"] .pt { color: var(--series-1); }
+.seg.persp .ps { font-size: 11px; color: var(--text-muted); font-weight: 400; }
+
+/* ---- layout ---------------------------------------------------------- */
+.view { display: none; }
+.view.active { display: block; }
+
+.layout {
+  display: grid;
+  grid-template-columns: 340px minmax(0, 1fr);
+  gap: 20px;
+  padding: 20px 22px 60px;
+  max-width: 1760px;
+  margin: 0 auto;
+  align-items: start;
+}
+@media (max-width: 1080px) { .layout { grid-template-columns: 1fr; } }
+
+.panel {
+  position: sticky;
+  top: 70px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-height: calc(100vh - 92px);
+  overflow-y: auto;
+  padding-right: 4px;
+}
+@media (max-width: 1080px) { .panel { position: static; max-height: none; } }
+
+.results { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+
+/* ---- cards ----------------------------------------------------------- */
+.card {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+.card > header {
+  display: flex; align-items: center; gap: 10px;
+  margin: -2px 0 12px;
+}
+.card > header h3 { font-size: 13px; letter-spacing: .01em; }
+.card > header .hint { font-size: 11.5px; color: var(--text-muted); font-weight: 400; }
+.card > header .spacer { margin-left: auto; }
+
+.card-sub { font-size: 11.5px; color: var(--text-muted); margin: -6px 0 12px; }
+
+/* ---- forms ----------------------------------------------------------- */
+.field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 11px; }
+.field:last-child { margin-bottom: 0; }
+.field > label { font-size: 11.5px; color: var(--text-secondary); font-weight: 500; }
+.field .note { font-size: 10.5px; color: var(--text-muted); }
+
+.row { display: flex; gap: 9px; }
+.row > * { flex: 1; min-width: 0; }
+
+input[type="number"], input[type="text"], select {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-primary);
+  font: inherit; font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+input:focus, select:focus {
+  outline: none;
+  border-color: var(--series-1);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+input[type="range"] { width: 100%; accent-color: var(--series-1); }
+
+.seg { display: flex; gap: 3px; padding: 3px; background: var(--surface-2); border-radius: 10px; }
+.seg button {
+  flex: 1; appearance: none; border: 0; cursor: pointer;
+  padding: 7px 8px; border-radius: 7px;
+  background: transparent; color: var(--text-secondary);
+  font: inherit; font-size: 12px; font-weight: 500;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.seg button[aria-pressed="true"] { background: var(--surface-1); color: var(--text-primary); box-shadow: 0 1px 3px rgba(0,0,0,.3); }
+.seg.vertical { flex-direction: column; }
+.seg.vertical button { text-align: left; }
+
+.check { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-secondary); cursor: pointer; }
+.check input { accent-color: var(--series-1); width: 15px; height: 15px; }
+
+.btn {
+  appearance: none; cursor: pointer;
+  padding: 10px 16px; border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  background: var(--series-1); color: #fff;
+  font: inherit; font-size: 13px; font-weight: 600;
+  transition: filter .15s;
+}
+.btn:hover { filter: brightness(1.08); }
+.btn:disabled { opacity: .5; cursor: default; filter: none; }
+.btn.secondary { background: var(--surface-2); color: var(--text-primary); border-color: var(--border); }
+
+/* ---- legs ------------------------------------------------------------ */
+.legs { display: flex; flex-direction: column; gap: 6px; }
+.leg { display: flex; align-items: center; gap: 8px; }
+.leg .idx { font-size: 11px; color: var(--text-muted); width: 34px; font-variant-numeric: tabular-nums; }
+.leg input { flex: 1; }
+.leg button {
+  appearance: none; cursor: pointer; width: 28px; height: 32px;
+  border-radius: 7px; border: 1px solid var(--border);
+  background: var(--surface-2); color: var(--text-muted); font-size: 15px; line-height: 1;
+}
+.leg button:hover { color: var(--critical); border-color: var(--border-strong); }
+
+/* ---- quote / hero ---------------------------------------------------- */
+.quote {
+  background: linear-gradient(180deg, var(--surface-2), var(--surface-1));
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  padding: 18px;
+}
+.hero-label { font-size: 11.5px; color: var(--text-secondary); text-transform: none; }
+.hero {
+  font-size: 52px; font-weight: 650; line-height: 1.02;
+  letter-spacing: -0.03em; margin: 2px 0 2px;
+  /* proportional figures — tabular reads too loose at this size */
+}
+.hero-note { font-size: 12px; color: var(--text-muted); }
+
+.quote-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px 14px;
+  margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border);
+}
+.qi .k { font-size: 10.5px; color: var(--text-muted); }
+.qi .v { font-size: 16px; font-weight: 600; letter-spacing: -0.01em; }
+.qi .v small { font-size: 11px; font-weight: 500; color: var(--text-muted); }
+
+/* ---- KPI tiles ------------------------------------------------------- */
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(148px, 1fr)); gap: 10px; }
+.kpi {
+  background: var(--surface-1); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 12px 13px;
+}
+.kpi .k { font-size: 10.5px; color: var(--text-muted); margin-bottom: 3px; }
+.kpi .v { font-size: 21px; font-weight: 620; letter-spacing: -0.02em; }
+.kpi .d { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+.kpi .v.pos { color: var(--good); }
+.kpi .v.neg { color: var(--critical); }
+
+/* ---- charts ---------------------------------------------------------- */
+.chart-card { background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
+.chart-card > header { display: flex; align-items: baseline; gap: 10px; margin-bottom: 4px; }
+.chart-card > header h3 { font-size: 13px; }
+.chart-card > header .hint { font-size: 11.5px; color: var(--text-muted); }
+.chart-card > header .spacer { margin-left: auto; }
+
+.chart { position: relative; width: 100%; height: 300px; }
+.chart.tall { height: 380px; }
+.chart.short { height: 230px; }
+.chart-canvas { display: block; width: 100%; height: 100%; }
+
+.chart-tip {
+  position: absolute; pointer-events: none; z-index: 5;
+  background: var(--surface-3);
+  border: 1px solid var(--border-strong);
+  border-radius: 9px; padding: 8px 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .4);
+  min-width: 132px;
+}
+.tip-head { font-size: 10.5px; color: var(--text-muted); margin-bottom: 5px; }
+.tip-row { display: flex; align-items: center; gap: 7px; line-height: 1.6; }
+.tip-key { width: 11px; height: 2px; border-radius: 2px; flex: none; }
+.tip-val { font-size: 12.5px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.tip-lab { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+
+.legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 10px; }
+.legend-item { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--text-secondary); }
+.legend-key { width: 13px; height: 2px; border-radius: 2px; }
+.legend-key.box { height: 10px; border-radius: 3px; }
+
+/* min() matters here — without it a 400px footprint would not shrink on a
+   narrow phone and the whole page would scroll sideways */
+.grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(400px, 100%), 1fr)); gap: 16px; }
+
+/* ---- callout ---------------------------------------------------------- */
+.callout {
+  display: flex; gap: 11px;
+  border: 1px solid var(--border);
+  border-left: 2px solid var(--series-1);
+  background: var(--surface-1);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+}
+.callout .ico { font-size: 14px; line-height: 1.4; }
+.callout .body { font-size: 12.5px; color: var(--text-secondary); }
+.callout .body strong { color: var(--text-primary); font-weight: 600; }
+.callout.warn { border-left-color: var(--warning); }
+.callout.bad { border-left-color: var(--critical); }
+
+/* ---- tables ---------------------------------------------------------- */
+.tablewrap { overflow-x: auto; margin-top: 10px; }
+/* the log can run to hundreds of rows — do not let it stretch the page */
+.logwrap { max-height: 460px; overflow-y: auto; }
+.logwrap thead th { position: sticky; top: 0; background: var(--surface-1); z-index: 1; }
+tbody tr.win td:first-child { box-shadow: inset 2px 0 0 var(--good); }
+tbody tr.loss td:first-child { box-shadow: inset 2px 0 0 var(--critical); }
+td.pos { color: var(--good); }
+td.neg { color: var(--critical); }
+table { border-collapse: collapse; width: 100%; font-size: 12px; }
+th, td { padding: 6px 10px; text-align: right; white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+thead th { color: var(--text-muted); font-weight: 500; font-size: 10.5px; border-bottom: 1px solid var(--border); }
+tbody td { font-variant-numeric: tabular-nums; border-bottom: 1px solid var(--gridline); }
+tbody tr:last-child td { border-bottom: 0; }
+
+/* ---- progress --------------------------------------------------------- */
+.runbar { display: flex; align-items: center; gap: 12px; }
+.progress { flex: 1; height: 4px; border-radius: 3px; background: var(--surface-3); overflow: hidden; }
+.progress > i { display: block; height: 100%; width: 0; background: var(--series-1); transition: width .1s linear; }
+.runstate { font-size: 11px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+
+/* Results that belong to the other side of the trade: dimmed and desaturated
+   until re-run, so stale numbers are never mistaken for current ones. */
+.results.stale { opacity: .38; filter: saturate(.4); transition: opacity .2s, filter .2s; }
+
+/* while recomputing, dim the previous drawing — no skeleton, no jump */
+.results.busy .chart-card, .results.busy .kpis { opacity: .55; transition: opacity .12s; }
+
+/* ---- mobile ---------------------------------------------------------- */
+/* Without this the header breaks into four lines on a phone and the buttons
+   in card headers overflow off the page. */
+@media (max-width: 720px) {
+  .topbar { padding: 9px 13px; gap: 10px; }
+  .brand { gap: 0; }
+  .brand h1 { font-size: 14px; white-space: nowrap; }
+  .brand .sub { display: none; }
+  .tab { padding: 7px 11px; font-size: 12.5px; }
+  .icon-btn { width: 32px; height: 32px; }
+
+  .layout { padding: 14px 13px 48px; gap: 14px; }
+  .card, .chart-card, .quote { padding: 13px; }
+
+  /* the card header wraps, controls move to a second line */
+  .card > header, .chart-card > header { flex-wrap: wrap; row-gap: 9px; }
+  .card > header .spacer, .chart-card > header .spacer { flex-basis: 100%; margin-left: 0; }
+
+  .chart { height: 250px; }
+  .chart.tall { height: 300px; }
+  .chart.short { height: 200px; }
+
+  .hero { font-size: 38px; }
+  .quote-grid { grid-template-columns: 1fr; gap: 10px; }
+  .kpis { grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); gap: 8px; }
+  .logwrap { max-height: 340px; }
+}
+
+.tab { white-space: nowrap; }
+
+.muted { color: var(--text-muted); }
+.mono { font-variant-numeric: tabular-nums; }
+.hidden { display: none !important; }
+
+</style>
+</head>
+<body>
+<script>
+/* The theme is driven by an attribute that is always present, never a bare
+ * :root — a host page can rewrite <html> and leave the document unstamped.
+ * Dark is the deliberate default; the toggle in the bar flips it. */
+(function () {
+  var r = document.documentElement;
+  if (!r.dataset.theme) r.dataset.theme = 'dark';
+})();
+</script>
+<div class="app">
+
+  <div class="topbar">
+    <div class="brand">
+      <h1>Parlay Kelly</h1>
+      <span class="sub">combo tickets · how much to risk</span>
+    </div>
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" id="tab-quote" aria-selected="true" data-view="quote">Single ticket</button>
+      <button class="tab" role="tab" id="tab-range" aria-selected="false" data-view="range">Ticket band</button>
+    </div>
+    <a class="icon-btn repo-link" href="https://github.com/frla18cz/parlay-kelly"
+       title="Source on GitHub" aria-label="Source on GitHub" target="_blank" rel="noopener">
+      <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true" focusable="false">
+        <path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38
+        0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01
+        1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95
+        0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.42 7.42 0 0 1 2-.27c.68 0
+        1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87
+        3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/>
+      </svg>
+    </a>
+    <button class="icon-btn" id="themeToggle" title="Toggle theme" aria-label="Toggle theme">◐</button>
+  </div>
+
+  <!-- ══════════════════ PERSPECTIVE — governs both tabs ══════════════════ -->
+  <div class="perspbar">
+    <div class="perspbar-lead">
+      <span class="perspbar-q">Which side are you on?</span>
+      <span class="perspbar-note" id="perspNote">You win when the combo <strong>misses</strong>.</span>
+    </div>
+    <div class="seg persp" id="perspective" role="group" aria-label="Which side of the ticket you take">
+      <button data-v="sell" aria-pressed="true">
+        <span class="pt">I sell the combo</span>
+        <span class="ps">write it, collect the premium</span>
+      </button>
+      <button data-v="buy" aria-pressed="false">
+        <span class="pt">I buy the combo</span>
+        <span class="ps">back it, chase the payout</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════ SECTION 1 ══════════════════════════ -->
+  <section class="view active" id="view-quote">
+  <div class="layout">
+
+    <div class="panel">
+
+      <div class="card">
+        <header><h3>Bankroll</h3></header>
+        <div class="field">
+          <input type="number" id="q_bankroll" value="10000" min="1" step="100">
+        </div>
+      </div>
+
+      <div class="card">
+        <header>
+          <h3>Ticket</h3>
+          <span class="spacer"></span>
+          <label class="check"><input type="checkbox" id="q_manualProduct"> enter product directly</label>
+        </header>
+
+        <div id="q_legsWrap">
+          <div class="legs" id="q_legs"></div>
+          <div class="field" style="margin-top:9px">
+            <button class="btn secondary" id="q_addLeg" type="button">+ add leg</button>
+          </div>
+        </div>
+
+        <div class="field hidden" id="q_productWrap">
+          <label>Product of leg prices</label>
+          <input type="number" id="q_product" value="0.25" min="0.0001" max="0.9999" step="0.001">
+        </div>
+
+        <div class="quote-grid" style="margin-top:12px;padding-top:12px">
+          <div class="qi"><div class="k">Fair price (product of legs)</div><div class="v mono" id="q_productOut">0.2500</div></div>
+          <div class="qi"><div class="k">Combo hits with p</div><div class="v mono" id="q_pOut">25.00 %</div></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <header><h3>Price</h3></header>
+
+        <div class="field">
+          <label>How the price is set</label>
+          <div class="seg" id="q_priceMode">
+            <button data-v="markup" aria-pressed="true">Fixed edge %</button>
+            <button data-v="explicit" aria-pressed="false">Explicit price</button>
+          </div>
+        </div>
+
+        <div class="field" id="q_markupField">
+          <label id="q_markupLabel">Markup over fair</label>
+          <div class="row">
+            <input type="number" id="q_markup" value="4" min="0" max="500" step="0.1">
+            <input type="number" id="q_priceShow" value="0.2600" step="0.0001" disabled>
+          </div>
+          <div class="note" id="q_markupNote">left: %, right: the resulting sale price</div>
+        </div>
+
+        <div class="field hidden" id="q_priceField">
+          <label id="q_priceLabel">Sale price (what you sell it at)</label>
+          <div class="row">
+            <input type="number" id="q_price" value="0.26" min="0.0001" max="0.9999" step="0.001">
+            <input type="number" id="q_markupShow" value="4.00" step="0.01" disabled>
+          </div>
+          <div class="note" id="q_priceNote">right: the implied edge in %</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <header><h3>Advanced</h3><span class="hint">model vs. reality</span></header>
+        <div class="field">
+          <label>Shift in the true probability: <span class="mono" id="q_haircutOut">0.0 %</span></label>
+          <input type="range" id="q_haircut" min="-30" max="30" value="0" step="0.5">
+          <div class="note" id="q_haircutNote">Positive = the combo hits more often than the product of legs says. Leg prices carry a spread, so reality tends to sit below the product — but Kelly is dangerous mainly when the edge is <strong>overestimated</strong>.</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <header><h3>Sizing</h3></header>
+        <div class="field">
+          <div class="seg vertical" id="q_sizing">
+            <button data-v="kelly" aria-pressed="true">Kelly (fraction of bankroll at risk)</button>
+            <button data-v="flatPct" aria-pressed="false">Flat % of starting bankroll</button>
+            <button data-v="flatAbs" aria-pressed="false">Flat amount</button>
+          </div>
+        </div>
+        <div class="field" id="q_multField">
+          <label>Kelly multiple: <span class="mono" id="q_multOut">1.00×</span></label>
+          <input type="range" id="q_mult" min="0" max="2" value="1" step="0.05">
+          <div class="note">Past roughly 2×, growth falls to zero even when the edge is real.</div>
+        </div>
+        <div class="field hidden" id="q_flatPctField">
+          <label>Risk per ticket (% of starting bankroll)</label>
+          <input type="number" id="q_flatPct" value="2" min="0.01" max="100" step="0.1">
+        </div>
+        <div class="field hidden" id="q_flatAbsField">
+          <label>Risk per ticket (amount)</label>
+          <input type="number" id="q_flatAbs" value="200" min="1" step="10">
+        </div>
+        <div class="field">
+          <label>Cap on risk per ticket (% of bankroll)</label>
+          <input type="number" id="q_cap" value="100" min="0.1" max="100" step="0.5">
+        </div>
+        <label class="check"><input type="checkbox" id="q_round"> round to whole contracts</label>
+      </div>
+
+      <div class="card">
+        <header><h3>Simulation</h3></header>
+        <div class="row">
+          <div class="field"><label>Tickets per path</label><input type="number" id="q_tickets" value="100" min="1" max="5000" step="10"></div>
+          <div class="field"><label>Simulations</label><input type="number" id="q_sims" value="20000" min="200" max="200000" step="1000"></div>
+        </div>
+        <div class="row">
+          <div class="field"><label>Seed</label><input type="number" id="q_seed" min="0" step="1"></div>
+          <div class="field"><label>Ruin below (% of bankroll)</label><input type="number" id="q_ruin" value="1" min="0.0001" max="99" step="0.5"></div>
+        </div>
+        <label class="check"><input type="checkbox" id="q_seedLock"> lock the seed (otherwise a fresh one each run)</label>
+        <div class="runbar" style="margin-top:12px">
+          <button class="btn" id="q_run">Run simulation</button>
+          <div class="progress"><i id="q_prog"></i></div>
+        </div>
+        <div class="runstate" id="q_state" style="margin-top:7px">ready</div>
+      </div>
+
+    </div>
+
+    <div class="results" id="q_results">
+
+      <div class="quote" id="q_quoteCard">
+        <div class="hero-label">Kelly — the most of your bankroll to put at risk on this ticket</div>
+        <div class="hero mono" id="q_heroF">3.85 %</div>
+        <div class="hero-note" id="q_heroNote"></div>
+        <div class="quote-grid">
+          <div class="qi"><div class="k">Max loss (what you risk)</div><div class="v mono" id="q_maxLoss">—</div></div>
+          <div class="qi"><div class="k">Contracts</div><div class="v mono" id="q_contracts">—</div></div>
+          <div class="qi"><div class="k" id="q_premiumLabel">Premium collected</div><div class="v mono" id="q_premium">—</div></div>
+          <div class="qi"><div class="k">Total EV</div><div class="v mono" id="q_ev">—</div></div>
+          <div class="qi"><div class="k">Growth per ticket</div><div class="v mono" id="q_growth">—</div></div>
+          <div class="qi"><div class="k">Zero growth at</div><div class="v mono" id="q_k0">—</div></div>
+        </div>
+      </div>
+
+      <div id="q_callouts"></div>
+
+      <div class="kpis" id="q_kpis"></div>
+
+      <div class="chart-card">
+        <header>
+          <h3>Bankroll over time</h3>
+          <span class="hint" id="q_fanHint">percentile bands across every simulation</span>
+          <span class="spacer"></span>
+          <label class="check"><input type="checkbox" id="q_log" checked> log axis</label>
+        </header>
+        <div class="chart tall" id="q_fan"></div>
+        <div class="legend" id="q_fanLegend"></div>
+      </div>
+
+      <div class="grid-2">
+        <div class="chart-card">
+          <header><h3>Final bankroll</h3><span class="hint">distribution after every ticket</span></header>
+          <div class="chart" id="q_hist"></div>
+          <div class="legend" id="q_histLegend"></div>
+        </div>
+        <div class="chart-card">
+          <header><h3>Max drawdown</h3><span class="hint">worst fall from a running peak</span></header>
+          <div class="chart" id="q_dd"></div>
+        </div>
+      </div>
+
+      <div class="chart-card">
+        <header>
+          <h3>Where you ended up, by decile</h3>
+          <span class="hint">each band = 10 % of simulations, the tick is their midpoint</span>
+        </header>
+        <div class="chart tall" id="q_deciles"></div>
+        <div class="callout" style="margin-top:12px">
+          <span class="ico">i</span>
+          <div class="body">
+            Read this row by row: "the worst 10 % of runs finished between here and here."
+            <strong>These are not paths.</strong> In the bankroll chart the median is not one
+            particular run — it is the median across every simulation at each moment. A path
+            sitting on the median halfway through can finish anywhere.
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="chart-card">
+          <header><h3>Quantile curve</h3><span class="hint">percentile → final bankroll</span></header>
+          <div class="chart" id="q_quant"></div>
+        </div>
+        <div class="chart-card">
+          <header><h3>Growth vs. Kelly multiple</h3><span class="hint">where the optimum is, and where it stops paying</span></header>
+          <div class="chart" id="q_curve"></div>
+        </div>
+      </div>
+
+      <div class="chart-card">
+        <header>
+          <h3>Sizing comparison</h3>
+          <span class="hint">same ticket, same randomness, different stake</span>
+          <span class="spacer"></span>
+          <button class="btn secondary" id="q_cmpRun" type="button">Run comparison</button>
+        </header>
+        <div class="chart tall" id="q_cmp"></div>
+        <div class="legend" id="q_cmpLegend"></div>
+        <div class="tablewrap" id="q_cmpTable"></div>
+      </div>
+
+      <div class="card">
+        <header>
+          <h3>Trade log</h3>
+          <span class="hint">ticket by ticket from one specific path</span>
+          <span class="spacer"></span>
+          <div class="seg" id="q_logPick">
+            <button data-v="5" aria-pressed="false">p5</button>
+            <button data-v="50" aria-pressed="true">median</button>
+            <button data-v="95" aria-pressed="false">p95</button>
+          </div>
+          <button class="btn secondary" id="q_logCsv" type="button">CSV</button>
+        </header>
+        <div class="card-sub" id="q_logInfo">Run a simulation and the log fills in.</div>
+        <div class="tablewrap logwrap" id="q_tradeLog"></div>
+      </div>
+
+      <div class="chart-card">
+        <header><h3>Sensitivity to an overestimated edge</h3><span class="hint">you size from the model, reality is elsewhere</span></header>
+        <div class="chart" id="q_sens"></div>
+        <div class="legend" id="q_sensLegend"></div>
+      </div>
+
+      <div class="card">
+        <header>
+          <h3>Numbers</h3><span class="hint">the table view — everything that is in the charts</span>
+          <span class="spacer"></span>
+          <button class="btn secondary" id="q_csv" type="button">Export CSV</button>
+        </header>
+        <div class="tablewrap" id="q_table"></div>
+      </div>
+
+    </div>
+  </div>
+  </section>
+
+  <!-- ══════════════════════════ SECTION 2 ══════════════════════════ -->
+  <section class="view" id="view-range">
+  <div class="layout">
+
+    <div class="panel">
+
+      <div class="card">
+        <header><h3>Bankroll</h3></header>
+        <div class="field"><input type="number" id="r_bankroll" value="10000" min="1" step="100"></div>
+      </div>
+
+      <div class="card">
+        <header><h3>The band</h3></header>
+
+        <div class="field">
+          <label id="r_markupLabel">Your edge (markup over fair)</label>
+          <input type="number" id="r_markup" value="4" min="0.1" max="200" step="0.1">
+        </div>
+
+        <div class="field">
+          <label>Your win probability — lower edge: <span class="mono" id="r_qLoOut">0.50</span></label>
+          <input type="range" id="r_qLo" min="0.02" max="0.98" value="0.5" step="0.01">
+        </div>
+        <div class="field">
+          <label>Your win probability — upper edge: <span class="mono" id="r_qHiOut">0.90</span></label>
+          <input type="range" id="r_qHi" min="0.02" max="0.98" value="0.9" step="0.01">
+        </div>
+
+        <div class="callout" style="margin:4px 0 11px">
+          <span class="ico">↔</span>
+          <div class="body">
+            You take tickets where <strong>you</strong> win with probability
+            <strong class="mono" id="r_mirrorQ">50–90 %</strong>.<br>
+            That is a leg product of <strong class="mono" id="r_mirrorP">0.10–0.50</strong>,
+            <span id="r_mirrorCLabel">sale price</span> <span class="mono" id="r_mirrorC">0.104–0.520</span>.
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Distribution across the band</label>
+          <div class="seg" id="r_dist">
+            <button data-v="uniform" aria-pressed="true">Uniform</button>
+            <button data-v="triangular" aria-pressed="false">Triangular</button>
+          </div>
+        </div>
+        <div class="field hidden" id="r_modeField">
+          <label>Peak: <span class="mono" id="r_distModeOut">0.50</span></label>
+          <input type="range" id="r_distMode" min="0" max="1" value="0.5" step="0.05">
+          <div class="note">0 = weight on balanced tickets, 1 = on long shots</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <header><h3>Concurrency</h3><span class="hint">open at the same time</span></header>
+        <div class="field">
+          <label>Tickets running concurrently</label>
+          <input type="number" id="r_concurrent" value="1" min="1" max="50" step="1">
+        </div>
+        <label class="check"><input type="checkbox" id="r_split"> tickets share legs — split Kelly between them</label>
+        <div class="note" style="margin-top:6px">Independent tickets on different events each get full Kelly, and concurrency then does not matter. Splitting only makes sense when the tickets hang on the same legs.</div>
+      </div>
+
+      <div class="card">
+        <header><h3>Advanced</h3></header>
+        <div class="field">
+          <label>Shift in the true probability: <span class="mono" id="r_haircutOut">0.0 %</span></label>
+          <input type="range" id="r_haircut" min="-30" max="30" value="0" step="0.5">
+        </div>
+      </div>
+
+      <div class="card">
+        <header><h3>Sizing</h3></header>
+        <div class="field">
+          <div class="seg vertical" id="r_sizing">
+            <button data-v="kelly" aria-pressed="true">Kelly (fraction of bankroll at risk)</button>
+            <button data-v="flatPct" aria-pressed="false">Flat % of starting bankroll</button>
+            <button data-v="flatAbs" aria-pressed="false">Flat amount</button>
+          </div>
+        </div>
+        <div class="field" id="r_multField">
+          <label>Kelly multiple: <span class="mono" id="r_multOut">1.00×</span></label>
+          <input type="range" id="r_mult" min="0" max="2" value="1" step="0.05">
+        </div>
+        <div class="field hidden" id="r_flatPctField">
+          <label>Risk per ticket (% of starting bankroll)</label>
+          <input type="number" id="r_flatPct" value="2" min="0.01" max="100" step="0.1">
+        </div>
+        <div class="field hidden" id="r_flatAbsField">
+          <label>Risk per ticket (amount)</label>
+          <input type="number" id="r_flatAbs" value="200" min="1" step="10">
+        </div>
+        <div class="field">
+          <label>Cap on risk per ticket (% of bankroll)</label>
+          <input type="number" id="r_cap" value="100" min="0.1" max="100" step="0.5">
+        </div>
+      </div>
+
+      <div class="card">
+        <header><h3>Simulation</h3></header>
+        <div class="row">
+          <div class="field"><label>Tickets per path</label><input type="number" id="r_tickets" value="100" min="1" max="5000" step="10"></div>
+          <div class="field"><label>Simulations</label><input type="number" id="r_sims" value="20000" min="200" max="200000" step="1000"></div>
+        </div>
+        <div class="row">
+          <div class="field"><label>Seed</label><input type="number" id="r_seed" min="0" step="1"></div>
+          <div class="field"><label>Ruin below (% of bankroll)</label><input type="number" id="r_ruin" value="1" min="0.0001" max="99" step="0.5"></div>
+        </div>
+        <label class="check"><input type="checkbox" id="r_seedLock"> lock the seed (otherwise a fresh one each run)</label>
+        <div class="runbar" style="margin-top:12px">
+          <button class="btn" id="r_run">Run simulation</button>
+          <div class="progress"><i id="r_prog"></i></div>
+        </div>
+        <div class="runstate" id="r_state" style="margin-top:7px">ready</div>
+      </div>
+
+    </div>
+
+    <div class="results" id="r_results">
+
+      <div class="quote">
+        <div class="hero-label" id="r_heroLabel">Kelly per ticket — constant across the whole band at a fixed edge</div>
+        <div class="hero mono" id="r_heroF">3.85 %</div>
+        <div class="hero-note" id="r_heroNote"></div>
+        <div class="quote-grid">
+          <div class="qi"><div class="k">Growth per ticket, balanced</div><div class="v mono" id="r_gBal">—</div></div>
+          <div class="qi"><div class="k">Growth per ticket, long shots</div><div class="v mono" id="r_gFav">—</div></div>
+          <div class="qi"><div class="k">Ratio</div><div class="v mono" id="r_gRatio">—</div></div>
+          <div class="qi"><div class="k">Average across the band</div><div class="v mono" id="r_gAvg">—</div></div>
+        </div>
+      </div>
+
+      <div id="r_callouts"></div>
+
+      <div class="kpis" id="r_kpis"></div>
+
+      <div class="chart-card">
+        <header>
+          <h3>Bankroll over time</h3>
+          <span class="hint">tickets drawn at random from the band</span>
+          <span class="spacer"></span>
+          <label class="check"><input type="checkbox" id="r_log" checked> log axis</label>
+        </header>
+        <div class="chart tall" id="r_fan"></div>
+        <div class="legend" id="r_fanLegend"></div>
+      </div>
+
+      <div class="grid-2">
+        <div class="chart-card">
+          <header><h3>Growth per ticket by your win probability</h3><span class="hint">same capital at risk, different return</span></header>
+          <div class="chart" id="r_gcurve"></div>
+        </div>
+        <div class="chart-card">
+          <header><h3 id="r_mcurveTitle">Edge needed for even growth</h3><span class="hint">what to charge so every ticket earns the same</span></header>
+          <div class="chart" id="r_mcurve"></div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="chart-card">
+          <header><h3>Final bankroll</h3><span class="hint">distribution after every ticket</span></header>
+          <div class="chart" id="r_hist"></div>
+          <div class="legend" id="r_histLegend"></div>
+        </div>
+        <div class="chart-card">
+          <header><h3>Max drawdown</h3><span class="hint">worst fall from a running peak</span></header>
+          <div class="chart" id="r_dd"></div>
+        </div>
+      </div>
+
+      <div class="chart-card">
+        <header>
+          <h3>Where you ended up, by decile</h3>
+          <span class="hint">each band = 10 % of simulations, the tick is their midpoint</span>
+        </header>
+        <div class="chart tall" id="r_deciles"></div>
+      </div>
+
+      <div class="chart-card">
+        <header><h3>Quantile curve</h3><span class="hint">percentile → final bankroll</span></header>
+        <div class="chart" id="r_quant"></div>
+      </div>
+
+      <div class="chart-card">
+        <header>
+          <h3>Sizing comparison</h3>
+          <span class="hint">same band, same randomness, different stake</span>
+          <span class="spacer"></span>
+          <button class="btn secondary" id="r_cmpRun" type="button">Run comparison</button>
+        </header>
+        <div class="chart tall" id="r_cmp"></div>
+        <div class="legend" id="r_cmpLegend"></div>
+        <div class="tablewrap" id="r_cmpTable"></div>
+      </div>
+
+      <div class="card">
+        <header>
+          <h3>Trade log</h3>
+          <span class="hint">ticket by ticket from one specific path</span>
+          <span class="spacer"></span>
+          <div class="seg" id="r_logPick">
+            <button data-v="5" aria-pressed="false">p5</button>
+            <button data-v="50" aria-pressed="true">median</button>
+            <button data-v="95" aria-pressed="false">p95</button>
+          </div>
+          <button class="btn secondary" id="r_logCsv" type="button">CSV</button>
+        </header>
+        <div class="card-sub" id="r_logInfo">Run a simulation and the log fills in.</div>
+        <div class="tablewrap logwrap" id="r_tradeLog"></div>
+      </div>
+
+      <div class="card">
+        <header>
+          <h3>Numbers</h3><span class="hint">the table view</span>
+          <span class="spacer"></span>
+          <button class="btn secondary" id="r_csv" type="button">Export CSV</button>
+        </header>
+        <div class="tablewrap" id="r_table"></div>
+      </div>
+
+    </div>
+  </div>
+  </section>
+
+</div>
+
+<script>
+/* kelly.js — the analytical core.
+ *
+ * One combo (parlay) ticket, one contract, payout 1.00 if the combo hits.
+ * Everything is expressed from *your* point of view, whichever side you take:
+ *
+ *   SELL (you write the combo, you are the counterparty)
+ *       you collect  +c        with probability  q = 1 - p
+ *       you pay      -(1 - c)  with probability  p
+ *
+ *   BUY (you back the combo, the usual punter position)
+ *       you win      +(1 - c)  with probability  p
+ *       you lose     -c        with probability  q = 1 - p
+ *
+ * where p is the probability the combo hits and c is the price of the
+ * contract. The two sides are mirror images, so a single set of formulas
+ * covers both once win/loss are named from your seat rather than the
+ * market's.
+ */
+(function (global) {
+  'use strict';
+
+  var EPS = 1e-12;
+
+  function clamp(x, lo, hi) {
+    return x < lo ? lo : x > hi ? hi : x;
+  }
+
+  /* Product of the individual leg prices — the fair price of the combo,
+   * assuming the legs are independent. */
+  function askProduct(legs) {
+    var prod = 1;
+    for (var i = 0; i < legs.length; i++) {
+      var a = Number(legs[i]);
+      if (!isFinite(a) || a <= 0 || a >= 1) return NaN;
+      prod *= a;
+    }
+    return legs.length ? prod : NaN;
+  }
+
+  /* Price implied by an edge over fair.
+   *
+   * A seller needs to be paid ABOVE fair, a buyer needs to pay BELOW it, so
+   * the same positive `edge` moves the price in opposite directions. Both
+   * sides therefore enter the same positive number and mean "my margin".
+   */
+  function priceFromEdge(p, edge, side) {
+    return side === 'buy' ? p * (1 - edge) : p * (1 + edge);
+  }
+
+  /* Inverse of priceFromEdge: the edge implied by a price. */
+  function edgeFromPrice(p, c, side) {
+    if (!(p > EPS)) return NaN;
+    return side === 'buy' ? 1 - c / p : c / p - 1;
+  }
+
+  /* Derived parameters of one ticket, from your seat.
+   *
+   *   p       true probability the combo hits
+   *   c       price of one contract
+   *   side    'sell' = you write the combo (default)
+   *           'buy'  = you back the combo
+   */
+  function ticketParams(p, c, side) {
+    var isSell = side !== 'buy';
+    // Normalised to "what I win / what I lose". Buying flips both the
+    // stake and the event you are rooting for.
+    var winProb = isSell ? 1 - p : p;
+    var risk = isSell ? 1 - c : c;         // lost per contract
+    var gain = isSell ? c : 1 - c;         // won per contract
+    var b = risk > EPS ? gain / risk : Infinity;
+    var evPerContract = isSell ? c - p : p - c;
+
+    return {
+      side: isSell ? 'sell' : 'buy',
+      p: p,
+      q: 1 - p,
+      price: c,
+      winProb: winProb,
+      lossProb: 1 - winProb,
+      riskPerContract: risk,
+      gainPerContract: gain,
+      b: b,
+      evPerContract: evPerContract,
+      // Price at which EV is exactly zero.
+      breakevenPrice: p,
+      hasEdge: evPerContract > EPS
+    };
+  }
+
+  /* Full Kelly = the fraction of BANKROLL AT RISK (max loss / bankroll).
+   *
+   *     f* = (b·winProb - lossProb) / b
+   *
+   * With an asymmetric payout this is the only unambiguous definition:
+   * "fraction of stake" and "fraction of exposure" part ways once winning
+   * and losing move different amounts of money.
+   *
+   * On the sell side it collapses to f* = (c - p)/c = EV/c.
+   */
+  function fullKelly(t) {
+    if (!(t.b > 0) || !isFinite(t.b)) return 0;
+    var f = (t.b * t.winProb - t.lossProb) / t.b;
+    return clamp(f, 0, 1);
+  }
+
+  /* Expected log growth of the bankroll per ticket:
+   *     g(f) = winProb·ln(1 + f·b) + lossProb·ln(1 - f)
+   */
+  function growthRate(t, f) {
+    if (f <= 0) return 0;
+    if (f >= 1) return -Infinity;
+    var gainMult = 1 + f * t.b;
+    var lossMult = 1 - f;
+    if (gainMult <= 0 || lossMult <= 0) return -Infinity;
+    return t.winProb * Math.log(gainMult) + t.lossProb * Math.log(lossMult);
+  }
+
+  /* Variance of the per-ticket log return — needed for drawdown. */
+  function logVariance(t, f) {
+    if (f <= 0 || f >= 1) return 0;
+    var logWin = Math.log(1 + f * t.b);
+    var logLoss = Math.log(1 - f);
+    var g = t.winProb * logWin + t.lossProb * logLoss;
+    return t.winProb * Math.pow(logWin - g, 2) + t.lossProb * Math.pow(logLoss - g, 2);
+  }
+
+  /* Probability the bankroll ever falls to a fraction `frac` of its STARTING
+   * value.
+   *
+   * P ≈ frac^s, where s = 2g / var(log) — the classic fixed-barrier problem
+   * (gambler's ruin via an exponential martingale). More general than the
+   * textbook x^(2/k - 1), which only holds in the diffusion limit of a
+   * symmetric bet.
+   *
+   * NOTE: this is NOT max drawdown from a running peak. That is a reflected
+   * walk, and it grows roughly logarithmically with the horizon — it does
+   * not converge to anything. The fixed barrier does converge (simulation:
+   * 49.2 % against 49.8 % theory over 100k tickets); drawdown from a peak
+   * does not (56 % → 87 % → 98 % over 1k/10k/100k tickets).
+   */
+  function drawdownProb(t, f, frac) {
+    if (f <= 0 || frac <= 0 || frac >= 1) return 0;
+    var g = growthRate(t, f);
+    if (!(g > 0)) return 1;                 // without growth, any level is reached eventually
+    var varLog = logVariance(t, f);
+    if (varLog < 1e-15) return 0;
+    return clamp(Math.pow(frac, 2 * g / varLog), 0, 1);
+  }
+
+  /* Analytical risk of ruin for a FLAT stake (comparison mode).
+   *
+   * Solves the characteristic equation of a random walk with steps +W, -L:
+   *     winProb·r^W + lossProb·r^(-L) = 1,  root r ∈ (0,1)
+   * Risk of ruin = r^(bankroll / bet).
+   */
+  function fixedRiskOfRuin(t, betSize, bankroll) {
+    if (!t.hasEdge) return 1;
+    if (betSize <= 0 || bankroll <= 0) return 1;
+    var W = t.b, L = 1;
+    var units = bankroll / betSize;
+    function fn(r) {
+      return t.winProb * Math.pow(r, W) + t.lossProb * Math.pow(r, -L) - 1;
+    }
+    var lo = 1e-10, hi = 1 - 1e-10;
+    if (fn(lo) >= 0 && fn(hi) >= 0) return 0;
+    for (var i = 0; i < 200; i++) {
+      var mid = (lo + hi) / 2;
+      if (fn(mid) > 0) lo = mid; else hi = mid;
+      if (hi - lo < 1e-15) break;
+    }
+    return clamp(Math.pow((lo + hi) / 2, units), 0, 1);
+  }
+
+  /* The Kelly multiple at which growth falls exactly to zero.
+   *
+   * The familiar "2× Kelly = zero growth" holds EXACTLY only for a symmetric
+   * bet (winProb = 0.5). With an asymmetric payout the point sits lower
+   * (~1.977 at winProb = 0.9, 4 % edge), so it is found numerically rather
+   * than hardcoded to 2.0.
+   */
+  function zeroGrowthMultiple(t) {
+    var fStar = fullKelly(t);
+    if (fStar <= EPS) return NaN;
+    var lo = 1, hi = Math.min(1 / fStar * 0.999999, 1e6);
+    if (growthRate(t, clamp(fStar * hi, 0, 0.999999)) > 0) return hi;
+    for (var i = 0; i < 200; i++) {
+      var mid = (lo + hi) / 2;
+      if (growthRate(t, clamp(fStar * mid, 0, 0.999999)) > 0) lo = mid; else hi = mid;
+    }
+    return (lo + hi) / 2;
+  }
+
+  /* How far the edge can be overestimated before growth hits zero.
+   *
+   * You size from a model probability pModel, but reality is different. For a
+   * seller the danger is the combo hitting MORE often than modelled; for a
+   * buyer it is hitting LESS often. Returns the true p at which g = 0 and the
+   * relative margin against the model (signed: negative means reality has to
+   * fall for you to be hurt).
+   */
+  function edgeTolerance(pModel, c, side, kellyMult) {
+    var t = ticketParams(pModel, c, side);
+    var f = fullKelly(t) * kellyMult;
+    if (f <= EPS) return { pBreak: NaN, relativeMargin: NaN };
+    var isSell = t.side === 'sell';
+    var lo = pModel;
+    var hi = isSell ? Math.min(0.999999, c) : Math.max(1e-6, c);
+    function gAt(pT) {
+      // f stays fixed (you sized from the model); only reality moves.
+      var tt = ticketParams(pT, c, side);
+      return growthRate({ b: t.b, winProb: tt.winProb, lossProb: tt.lossProb }, f);
+    }
+    for (var i = 0; i < 200; i++) {
+      var mid = (lo + hi) / 2;
+      if (gAt(mid) > 0) lo = mid; else hi = mid;
+    }
+    var pBreak = (lo + hi) / 2;
+    return { pBreak: pBreak, relativeMargin: pBreak / pModel - 1 };
+  }
+
+  /* The edge that brings this ticket's growth up to a reference value.
+   *
+   * Answers "how much margin do I need on a lopsided ticket for it to earn
+   * as much as a balanced one". Returns the edge as a decimal (0.04 = 4 %),
+   * in the same convention as priceFromEdge — a positive number meaning
+   * "my margin", whichever side you are on.
+   */
+  function edgeForGrowth(p, gTarget, side) {
+    var isSell = side !== 'buy';
+    // A seller can mark up until the price approaches 1; a buyer can only
+    // discount until the price approaches 0, i.e. edge approaches 1.
+    var lo = 1e-6;
+    var hi = isSell ? Math.min(5, 0.98 / p - 1) : 0.999999;
+    if (hi <= lo) return NaN;
+    function gAt(m) {
+      var c = priceFromEdge(p, m, side);
+      if (c <= 0 || c >= 1) return -Infinity;
+      var t = ticketParams(p, c, side);
+      return growthRate(t, fullKelly(t));
+    }
+    if (gAt(hi) < gTarget) return NaN;      // even an extreme edge cannot reach it
+    for (var i = 0; i < 200; i++) {
+      var mid = (lo + hi) / 2;
+      if (gAt(mid) < gTarget) lo = mid; else hi = mid;
+    }
+    return (lo + hi) / 2;
+  }
+
+  /* Full analysis of a single ticket. */
+  function analyseTicket(opts) {
+    var p = opts.p;
+    var c = opts.price;
+    var side = opts.side || 'sell';
+    var bankroll = opts.bankroll;
+    var mult = opts.kellyMultiplier == null ? 1 : opts.kellyMultiplier;
+    var cap = opts.capFraction == null ? null : opts.capFraction;
+
+    var t = ticketParams(p, c, side);
+    var fStar = fullKelly(t);
+    var scaled = fStar * mult;
+    var applied = Math.max(scaled, 0);
+    var capHit = false;
+    if (cap != null && applied > cap) { applied = cap; capHit = true; }
+
+    var maxLoss = bankroll * applied;
+    var contracts = t.riskPerContract > EPS ? maxLoss / t.riskPerContract : 0;
+    if (opts.roundContracts) {
+      contracts = Math.floor(contracts);
+      maxLoss = contracts * t.riskPerContract;
+      applied = bankroll > 0 ? maxLoss / bankroll : 0;
+    }
+
+    return {
+      params: t,
+      fullKellyFraction: fStar,
+      scaledFraction: scaled,
+      appliedFraction: applied,
+      capHit: capHit,
+      maxLoss: maxLoss,                                  // the most you can lose
+      contracts: contracts,
+      premium: contracts * t.gainPerContract,            // the most you can win
+      evTotal: contracts * t.evPerContract,
+      evPerContract: t.evPerContract,
+      growthPerTicket: growthRate(t, applied),
+      growthAtFullKelly: growthRate(t, fStar),
+      zeroGrowthMultiple: zeroGrowthMultiple(t),
+      dd50: drawdownProb(t, applied, 0.5),
+      dd25: drawdownProb(t, applied, 0.25),
+      breakevenPrice: t.breakevenPrice,
+      hasEdge: t.hasEdge
+    };
+  }
+
+  global.Kelly = {
+    EPS: EPS,
+    clamp: clamp,
+    askProduct: askProduct,
+    priceFromEdge: priceFromEdge,
+    edgeFromPrice: edgeFromPrice,
+    ticketParams: ticketParams,
+    fullKelly: fullKelly,
+    growthRate: growthRate,
+    logVariance: logVariance,
+    drawdownProb: drawdownProb,
+    fixedRiskOfRuin: fixedRiskOfRuin,
+    zeroGrowthMultiple: zeroGrowthMultiple,
+    edgeTolerance: edgeTolerance,
+    edgeForGrowth: edgeForGrowth,
+    markupForGrowth: edgeForGrowth,   // legacy name
+    analyseTicket: analyseTicket
+  };
+})(typeof self !== 'undefined' ? self : this);
+
+</script>
+<script>
+/* sim.js — the Monte Carlo engine.
+ *
+ * Runs in batches on the main thread, yielding to the event loop between
+ * them. A Web Worker is deliberately NOT used: the engine handles 100M steps
+ * in a few seconds, and chunked execution behaves identically in the
+ * single-file build, over file://, and inside a strict-CSP host where a blob
+ * worker could fail outright.
+ *
+ * Memory is O(1) in the number of simulations. Rather than keeping every path
+ * (100k × 1000 would be 800 MB) it keeps:
+ *   - a log-grid histogram per checkpoint → percentile bands
+ *   - exact arrays of final bankrolls and max drawdowns (N × 8 B)
+ *   - up to 200 full sample paths for the spaghetti in the fan chart
+ */
+(function (global) {
+  'use strict';
+
+  var K = global.Kelly;
+
+  var MAX_STORED_PATHS = 200;   // enough to read as texture, cheap to store
+  var MAX_CHECKPOINTS = 121;    // the fan chart cannot resolve more than this
+  var LOG_MIN = -9;             // log10(B/B0) — lower edge of the grid
+  var LOG_MAX = 9;
+  var NBINS = 2400;             // 0.0075 dex/bin → ~1.7 % relative accuracy
+  var BINW = (LOG_MAX - LOG_MIN) / NBINS;
+  var LOG10E = Math.LOG10E;
+
+  /* mulberry32 — a fast seeded PRNG, fully reproducible. */
+  function makeRng(seed) {
+    var a = seed >>> 0;
+    return function () {
+      a = (a + 0x6D2B79F5) | 0;
+      var t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  /* Percentile of an already sorted array. */
+  function percentileSorted(sorted, pct) {
+    var n = sorted.length;
+    if (!n) return 0;
+    var idx = (pct / 100) * (n - 1);
+    var lo = Math.floor(idx);
+    var hi = Math.min(lo + 1, n - 1);
+    var frac = idx - lo;
+    return sorted[lo] * (1 - frac) + sorted[hi] * frac;
+  }
+
+  /* Percentile from one checkpoint's histogram, linearly interpolated inside
+   * the bin. Returns a multiple of the starting bankroll. */
+  function percentileFromHist(hist, offset, total, pct) {
+    var target = (pct / 100) * total;
+    var cum = 0;
+    for (var i = 0; i < NBINS; i++) {
+      var cnt = hist[offset + i];
+      if (cnt === 0) continue;
+      if (cum + cnt >= target) {
+        var within = cnt > 0 ? (target - cum) / cnt : 0;
+        var logv = LOG_MIN + (i + within) * BINW;
+        return Math.pow(10, logv);
+      }
+      cum += cnt;
+    }
+    return Math.pow(10, LOG_MAX);
+  }
+
+  /* Evenly spaced checkpoints over 0..rounds, both ends included. */
+  function buildCheckpoints(rounds) {
+    var n = Math.min(rounds + 1, MAX_CHECKPOINTS);
+    var cps = new Int32Array(n);
+    for (var i = 0; i < n; i++) {
+      cps[i] = n === 1 ? 0 : Math.round((i * rounds) / (n - 1));
+    }
+    return cps;
+  }
+
+  /* Inverse CDF of a triangular distribution on [lo,hi] peaking at `mode`. */
+  function triangular(u, lo, hi, mode) {
+    var span = hi - lo;
+    if (span <= 0) return lo;
+    var f = (mode - lo) / span;
+    if (u < f) return lo + Math.sqrt(u * span * (mode - lo));
+    return hi - Math.sqrt((1 - u) * span * (hi - mode));
+  }
+
+  /* Normalise the config and precompute whatever stays constant. */
+  function prepare(cfg) {
+    var side = cfg.side || 'sell';
+    var isRange = cfg.mode === 'range';
+    var concurrent = Math.max(1, Math.round(cfg.concurrent || 1));
+    var rounds = Math.max(1, Math.ceil(cfg.tickets / concurrent));
+
+    var fixed = null;
+    if (!isRange) {
+      // p_true may sit away from the model (the edge haircut).
+      var pTrue = K.clamp(cfg.p * (1 + (cfg.probHaircut || 0)), 1e-9, 1 - 1e-9);
+      var tModel = K.ticketParams(cfg.p, cfg.price, side);
+      var tTrue = K.ticketParams(pTrue, cfg.price, side);
+      fixed = {
+        // sized from the model, resolved against reality
+        fStar: K.fullKelly(tModel),
+        b: tModel.b,
+        risk: tModel.riskPerContract,
+        winProb: tTrue.winProb,
+        pModel: cfg.p,
+        price: cfg.price
+      };
+    }
+
+    return {
+      side: side, isRange: isRange, concurrent: concurrent, rounds: rounds,
+      fixed: fixed,
+      checkpoints: buildCheckpoints(rounds),
+      seed: (cfg.seed || 0) >>> 0,
+      markup: cfg.markup || 0,
+      qLo: cfg.qLo, qHi: cfg.qHi,
+      dist: cfg.dist || 'uniform',
+      distMode: cfg.distMode == null ? 0.5 : cfg.distMode,
+      haircut: cfg.probHaircut || 0,
+      B0: cfg.bankroll,
+      sims: cfg.sims,
+      sizing: cfg.sizing || { type: 'kelly', mult: 1 },
+      cap: cfg.capFraction == null ? 1 : cfg.capFraction,
+      round: !!cfg.roundContracts,
+      // Default is NOT to split: independent tickets each get full Kelly.
+      // Splitting encodes an assumption of perfect correlation (shared legs).
+      splitConcurrent: cfg.concurrent > 1 && cfg.concurrentSplit === true,
+      ruinLevel: cfg.bankroll * (cfg.ruinFraction == null ? 1e-6 : cfg.ruinFraction)
+    };
+  }
+
+  /* Every simulation gets its own well-spread seed, so any single path can be
+   * replayed on its own (see replay) without spinning through the ones
+   * before it. */
+  function mix32(z) {
+    z = (z + 0x9E3779B9) | 0;
+    z = Math.imul(z ^ (z >>> 16), 0x21f0aaad);
+    z = Math.imul(z ^ (z >>> 15), 0x735a2d97);
+    return (z ^ (z >>> 15)) >>> 0;
+  }
+  function simRng(seed, index) {
+    return makeRng(mix32((seed ^ mix32(index + 1)) >>> 0));
+  }
+
+  /* One simulation. `acc` may be null (replay only) and `log` may be an
+   * array, in which case every ticket is written into it. The betting logic
+   * lives in exactly ONE place so the log cannot drift from the simulation. */
+  function runSim(P, s, acc, log) {
+    var cps = P.checkpoints, nCp = cps.length;
+    var B0 = P.B0, ruinLevel = P.ruinLevel;
+    var sizing = P.sizing, cap = P.cap;
+    var isRange = P.isRange, conc = P.concurrent, isSell = P.side !== 'buy';
+    var qSpan = P.qHi - P.qLo;
+    var triMode = P.qLo + P.distMode * qSpan;
+    var rng = simRng(P.seed, s);
+
+    var B = B0, peak = B0, maxDD = 0, ruined = false;
+    // fixed barriers measured from the STARTING bankroll — unlike drawdown
+    // from a running peak, this quantity converges with the horizon
+    var below50 = false, below25 = false;
+    // Turnover = how much money changes hands in total. Without it two
+    // settings cannot be compared honestly — a ticket at 0.9 turns over 130×
+    // more than one at 0.1 for the same capital at risk.
+    var turnover = 0;
+    var storePath = acc && s < MAX_STORED_PATHS;
+    var pathOff = s * nCp;
+    var cpi = 0;
+    var ticket = 0;
+
+    if (cps[0] === 0) {
+      if (acc) {
+        acc.hist[0 * NBINS + binOf(1)]++;
+        if (storePath) acc.paths[pathOff] = B0;
+      }
+      cpi = 1;
+    }
+
+    for (var r = 1; r <= P.rounds; r++) {
+      if (!ruined) {
+        var Bstart = B;
+        var delta = 0;
+
+        for (var k = 0; k < conc; k++) {
+          var winProb, b, risk, fStar, pModel, c;
+
+          if (isRange) {
+            var u = rng();
+            var q = P.dist === 'triangular'
+              ? triangular(u, P.qLo, P.qHi, triMode)
+              : P.qLo + u * qSpan;
+            // The band is defined over YOUR win probability, so which
+            // combo probability that implies depends on the side you take.
+            // A seller wins when the combo misses, a buyer when it hits.
+            pModel = isSell ? 1 - q : q;
+            c = isSell ? pModel * (1 + P.markup) : pModel * (1 - P.markup);
+            if (c >= 0.999999) c = 0.999999;
+            if (c <= 0.000001) c = 0.000001;
+            // Sized from the model. Note this is constant across the band
+            // for a seller (m/(1+m)) but NOT for a buyer.
+            fStar = isSell ? (c - pModel) / c : (pModel - c) / (1 - c);
+            b = isSell ? c / (1 - c) : (1 - c) / c;
+            risk = isSell ? 1 - c : c;
+            var pTrue = pModel * (1 + P.haircut);  // reality may sit elsewhere
+            if (pTrue > 0.999999) pTrue = 0.999999;
+            winProb = isSell ? 1 - pTrue : pTrue;
+          } else {
+            fStar = P.fixed.fStar;
+            b = P.fixed.b;
+            risk = P.fixed.risk;
+            winProb = P.fixed.winProb;
+            pModel = P.fixed.pModel;
+            c = P.fixed.price;
+          }
+
+          var f;
+          if (sizing.type === 'flatPct') {
+            f = (sizing.pct * B0) / Bstart;        // flat % of the STARTING bankroll
+          } else if (sizing.type === 'flatAbs') {
+            f = sizing.amount / Bstart;            // flat amount
+          } else {
+            f = fStar * sizing.mult;
+          }
+          if (P.splitConcurrent) f /= conc;
+          if (f > cap) f = cap;
+          if (f > 0.999999) f = 0.999999;
+
+          ticket++;
+          if (!(f > 0)) {
+            if (log) log.push({ ticket: ticket, round: r, skipped: true, price: c, pModel: pModel, bankroll: B });
+            continue;
+          }
+
+          var L = f * Bstart;
+          var contracts = L / risk;
+          if (P.round) {
+            contracts = Math.floor(contracts);
+            if (contracts < 1) {
+              if (log) log.push({ ticket: ticket, round: r, skipped: true, price: c, pModel: pModel, bankroll: B });
+              continue;
+            }
+            L = contracts * risk;
+          }
+          if (L > Bstart) { L = Bstart; contracts = L / risk; }
+
+          var win = rng() < winProb;
+          var pnl = win ? L * b : -L;
+          delta += pnl;
+          turnover += contracts * c;
+
+          if (log) {
+            log.push({
+              ticket: ticket, round: r, skipped: false,
+              pModel: pModel, winProb: winProb, price: c,
+              fraction: f, liability: L, contracts: contracts,
+              premium: contracts * (isSell ? c : 1 - c), win: win, pnl: pnl,
+              bankroll: Bstart + delta
+            });
+          }
+        }
+
+        B = Bstart + delta;
+        if (B > peak) peak = B;
+        var dd = peak > 0 ? (peak - B) / peak : 0;
+        if (dd > maxDD) maxDD = dd;
+        if (B <= B0 * 0.5) below50 = true;
+        if (B <= B0 * 0.25) below25 = true;
+        if (B <= ruinLevel) { B = ruinLevel; ruined = true; }
+      }
+
+      if (acc) {
+        while (cpi < nCp && cps[cpi] === r) {
+          var mult = B / B0;
+          var lg = Math.log(mult);
+          acc.hist[cpi * NBINS + binOfLog(lg)]++;
+          acc.bandSum[cpi] += mult;
+          acc.logSumCp[cpi] += lg;         // for the geometric mean
+          if (storePath) acc.paths[pathOff + cpi] = B;
+          cpi++;
+        }
+      }
+    }
+
+    if (acc) {
+      acc.finals[s] = B;
+      acc.maxDD[s] = maxDD;
+      acc.logSum += Math.log(B / B0);
+      if (ruined) acc.ruined++;
+      if (B < B0) acc.belowStart++;
+      if (below50) acc.below50++;
+      if (below25) acc.below25++;
+      acc.turnoverSum += turnover;
+    }
+    return { final: B, maxDD: maxDD, ruined: ruined };
+  }
+
+  function runBatch(P, acc, from, to) {
+    for (var s = from; s < to; s++) runSim(P, s, acc, null);
+  }
+
+  function binOfLog(lnMult) {
+    var lg = lnMult * LOG10E;
+    var i = Math.floor((lg - LOG_MIN) / BINW);
+    return i < 0 ? 0 : i >= NBINS ? NBINS - 1 : i;
+  }
+  function binOf(mult) { return binOfLog(Math.log(mult)); }
+
+  /* Runs the simulation in batches. onProgress(0..1) is optional.
+   * Returns a Promise of the result. */
+  function run(cfg, onProgress) {
+    var P = prepare(cfg);
+    var cps = P.checkpoints;
+    var nCp = cps.length;
+    var N = P.sims;
+
+    var acc = {
+      checkpoints: cps,
+      hist: new Uint32Array(nCp * NBINS),
+      bandSum: new Float64Array(nCp),
+      logSumCp: new Float64Array(nCp),
+      paths: new Float64Array(Math.min(N, MAX_STORED_PATHS) * nCp),
+      finals: new Float64Array(N),
+      maxDD: new Float64Array(N),
+      logSum: 0, ruined: 0, belowStart: 0, below50: 0, below25: 0, turnoverSum: 0
+    };
+
+    // ~2M steps per batch, so one round lands around 30-60 ms
+    var stepsPerSim = P.rounds * P.concurrent;
+    var batch = Math.max(1, Math.min(N, Math.ceil(2e6 / Math.max(1, stepsPerSim))));
+
+    return new Promise(function (resolve) {
+      var done = 0;
+      function step() {
+        var to = Math.min(done + batch, N);
+        runBatch(P, acc, done, to);
+        done = to;
+        if (onProgress) onProgress(done / N);
+        if (done < N) {
+          setTimeout(step, 0);
+        } else {
+          resolve(finalise(P, acc, cfg));
+        }
+      }
+      setTimeout(step, 0);
+    });
+  }
+
+  function finalise(P, acc, cfg) {
+    var N = P.sims, nCp = acc.checkpoints.length, B0 = P.B0;
+
+    var bands = {
+      p5: new Float64Array(nCp), p25: new Float64Array(nCp),
+      p50: new Float64Array(nCp), p75: new Float64Array(nCp),
+      p95: new Float64Array(nCp), mean: new Float64Array(nCp),
+      geo: new Float64Array(nCp)
+    };
+    for (var i = 0; i < nCp; i++) {
+      var off = i * NBINS;
+      bands.p5[i] = percentileFromHist(acc.hist, off, N, 5) * B0;
+      bands.p25[i] = percentileFromHist(acc.hist, off, N, 25) * B0;
+      bands.p50[i] = percentileFromHist(acc.hist, off, N, 50) * B0;
+      bands.p75[i] = percentileFromHist(acc.hist, off, N, 75) * B0;
+      bands.p95[i] = percentileFromHist(acc.hist, off, N, 95) * B0;
+      bands.mean[i] = (acc.bandSum[i] / N) * B0;
+      // geometric mean — smooth, and exactly what Kelly maximises
+      bands.geo[i] = Math.exp(acc.logSumCp[i] / N) * B0;
+    }
+    // at t=0 every path sits at B0; the histogram rounds that, so pin it back
+    if (acc.checkpoints[0] === 0) {
+      bands.p5[0] = bands.p25[0] = bands.p50[0] = bands.p75[0] = bands.p95[0]
+        = bands.mean[0] = bands.geo[0] = B0;
+    }
+
+    var finalsSorted = acc.finals.slice().sort(function (a, b) { return a - b; });
+    var ddSorted = acc.maxDD.slice().sort(function (a, b) { return a - b; });
+
+    var sum = 0;
+    for (var j = 0; j < N; j++) sum += acc.finals[j];
+
+    var nPaths = Math.min(N, MAX_STORED_PATHS);
+    var paths = [];
+    for (var s = 0; s < nPaths; s++) {
+      paths.push(acc.paths.subarray(s * nCp, (s + 1) * nCp));
+    }
+
+    var totalTickets = P.rounds * P.concurrent;
+
+    return {
+      config: cfg,
+      finalsRaw: acc.finals,          // unsorted, indexed by simulation number
+      checkpoints: acc.checkpoints,
+      rounds: P.rounds,
+      concurrent: P.concurrent,
+      totalTickets: totalTickets,
+      bands: bands,
+      samplePaths: paths,
+      finals: finalsSorted,
+      maxDrawdowns: ddSorted,
+      stats: {
+        medianFinal: percentileSorted(finalsSorted, 50),
+        meanFinal: sum / N,
+        p5: percentileSorted(finalsSorted, 5),
+        p25: percentileSorted(finalsSorted, 25),
+        p75: percentileSorted(finalsSorted, 75),
+        p95: percentileSorted(finalsSorted, 95),
+        worst: finalsSorted[0],
+        best: finalsSorted[N - 1],
+        pctRuined: acc.ruined / N,
+        pctBelowStart: acc.belowStart / N,
+        // fixed barrier from the starting bankroll — converges with horizon
+        // mean turnover per path — how much money has to change hands for
+        // that result to be reachable at all
+        meanTurnover: acc.turnoverSum / N,
+        pctEverBelow50: acc.below50 / N,
+        pctEverBelow25: acc.below25 / N,
+        maxDDMedian: percentileSorted(ddSorted, 50),
+        maxDDp95: percentileSorted(ddSorted, 95),
+        // MC estimate of E[log] per ticket — must converge to analytic g
+        meanLogGrowthPerTicket: acc.logSum / N / totalTickets
+      }
+    };
+  }
+
+  /* Replays one specific simulation and returns the log of every ticket.
+   * It calls the same function as the real run, so it cannot drift from it. */
+  function replay(cfg, simIndex) {
+    var P = prepare(cfg);
+    var log = [];
+    var res = runSim(P, simIndex, null, log);
+    return { index: simIndex, log: log, final: res.final, maxDD: res.maxDD, ruined: res.ruined };
+  }
+
+  /* Index of the simulation whose result is closest to a given percentile.
+   * `finalsRaw` is the unsorted array indexed by simulation number. */
+  function indexAtPercentile(finalsRaw, sortedFinals, pct) {
+    var target = percentileSorted(sortedFinals, pct);
+    var best = 0, bestD = Infinity;
+    for (var i = 0; i < finalsRaw.length; i++) {
+      var d = Math.abs(finalsRaw[i] - target);
+      if (d < bestD) { bestD = d; best = i; }
+    }
+    return best;
+  }
+
+  /* Quantile curve: the value at each percentile 0..100. Answers "where did I
+   * end up in 50 % of cases" directly, without going through a histogram. */
+  function quantileCurve(sorted, steps) {
+    var n = steps || 101;
+    var pcts = new Float64Array(n), vals = new Float64Array(n);
+    for (var i = 0; i < n; i++) {
+      pcts[i] = (i / (n - 1)) * 100;
+      vals[i] = percentileSorted(sorted, pcts[i]);
+    }
+    return { pcts: pcts, values: vals };
+  }
+
+  /* Splits sorted results into `k` equal buckets and returns their bounds.
+   * "In this ten-percent band you finished between X and Y." */
+  function buckets(sorted, k) {
+    var out = [];
+    for (var i = 0; i < k; i++) {
+      var loP = (i / k) * 100, hiP = ((i + 1) / k) * 100;
+      out.push({
+        fromPct: loP, toPct: hiP,
+        lo: percentileSorted(sorted, loP),
+        hi: percentileSorted(sorted, hiP),
+        mid: percentileSorted(sorted, (loP + hiP) / 2)
+      });
+    }
+    return out;
+  }
+
+  /* Histogram for the bar chart: `values` are already sorted. */
+  function histogram(sortedValues, nBins, logScale) {
+    var n = sortedValues.length;
+    if (!n) return { edges: [], counts: [] };
+    var lo = sortedValues[0], hi = sortedValues[n - 1];
+    if (logScale) {
+      lo = Math.log10(Math.max(lo, 1e-12));
+      hi = Math.log10(Math.max(hi, 1e-12));
+    }
+    if (hi - lo < 1e-12) { hi = lo + 1; }
+    var w = (hi - lo) / nBins;
+    var counts = new Float64Array(nBins);
+    for (var i = 0; i < n; i++) {
+      var v = logScale ? Math.log10(Math.max(sortedValues[i], 1e-12)) : sortedValues[i];
+      var b = Math.floor((v - lo) / w);
+      if (b < 0) b = 0; if (b >= nBins) b = nBins - 1;
+      counts[b]++;
+    }
+    var edges = new Float64Array(nBins + 1);
+    for (var e = 0; e <= nBins; e++) {
+      var x = lo + e * w;
+      edges[e] = logScale ? Math.pow(10, x) : x;
+    }
+    return { edges: edges, counts: counts };
+  }
+
+  global.Sim = {
+    MAX_STORED_PATHS: MAX_STORED_PATHS,
+    makeRng: makeRng,
+    percentileSorted: percentileSorted,
+    triangular: triangular,
+    run: run,
+    replay: replay,
+    indexAtPercentile: indexAtPercentile,
+    quantileCurve: quantileCurve,
+    buckets: buckets,
+    histogram: histogram
+  };
+})(typeof self !== 'undefined' ? self : this);
+
+</script>
+<script>
+/* charts.js — a dependency-free canvas charting layer.
+ *
+ * Colours are read from CSS custom properties, so switching theme is just an
+ * attribute change on <html>. The plotting surface must stay --surface-1 or
+ * the contrast ratios checked by the palette validator no longer hold.
+ *
+ * House rules: 2px lines, hairline solid grid, markers >=8px with a 2px ring
+ * in the surface colour, a legend once there are 2+ series, never a value
+ * label on every point, and no secondary axis.
+ */
+(function (global) {
+  'use strict';
+
+  /* left/bottom must fit the rotated axis label BESIDE the tick text, or
+   * "5.0e-4" and "growth per ticket" end up on top of each other. */
+  var PAD = { top: 18, right: 20, bottom: 42, left: 76 };
+
+  /* ---- colours -------------------------------------------------------- */
+
+  var _css = null;
+  function css(name) {
+    if (!_css) _css = getComputedStyle(document.documentElement);
+    return _css.getPropertyValue(name).trim();
+  }
+  function invalidateColors() { _css = null; }
+
+  function withAlpha(hex, a) {
+    hex = hex.replace('#', '');
+    if (hex.length === 3) hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
+    var n = parseInt(hex, 16);
+    return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')';
+  }
+
+  /* ---- axes ------------------------------------------------------------ */
+
+  /* Classic 1-2-5 nice ticks. */
+  function niceTicks(min, max, target) {
+    if (!isFinite(min) || !isFinite(max) || min === max) {
+      return { ticks: [min], step: 1 };
+    }
+    var raw = (max - min) / Math.max(1, target);
+    var mag = Math.pow(10, Math.floor(Math.log10(raw)));
+    var norm = raw / mag;
+    var step = (norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 5 ? 5 : 10) * mag;
+    var first = Math.ceil(min / step) * step;
+    var ticks = [];
+    for (var v = first; v <= max + step * 1e-9; v += step) ticks.push(v);
+    return { ticks: ticks, step: step };
+  }
+
+  /* Ticks for a log axis — decades, plus intermediates when they are few. */
+  function logTicks(min, max) {
+    min = Math.max(min, 1e-12);
+    var lo = Math.floor(Math.log10(min)), hi = Math.ceil(Math.log10(max));
+    var decades = hi - lo;
+    var mids = decades <= 2 ? [1, 2, 5] : decades <= 5 ? [1, 3] : [1];
+    var ticks = [];
+    for (var d = lo; d <= hi; d++) {
+      for (var i = 0; i < mids.length; i++) {
+        var v = mids[i] * Math.pow(10, d);
+        if (v >= min * 0.999 && v <= max * 1.001) ticks.push(v);
+      }
+    }
+    return ticks;
+  }
+
+  /* ---- formatting ------------------------------------------------------ */
+
+  function fmtCompact(v) {
+    var a = Math.abs(v);
+    if (a >= 1e9) return (v / 1e9).toFixed(a >= 1e10 ? 0 : 1) + 'B';
+    if (a >= 1e6) return (v / 1e6).toFixed(a >= 1e7 ? 0 : 1) + 'M';
+    if (a >= 1e3) return (v / 1e3).toFixed(a >= 1e4 ? 0 : 1) + 'k';
+    if (a >= 10) return v.toFixed(0);
+    if (a >= 1) return v.toFixed(1);
+    if (a === 0) return '0';
+    // never exponential notation — "1.0e-7" reads terribly on an axis
+    if (a >= 0.001) return v.toFixed(3);
+    return v.toFixed(6);
+  }
+
+  function fmtMoney(v) { return fmtCompact(v); }
+  function fmtPct(v, d) { return (v * 100).toFixed(d == null ? 1 : d) + ' %'; }
+
+  /* ---- chart ----------------------------------------------------------- */
+
+  function Chart(container, opts) {
+    this.container = container;
+    this.opts = opts || {};
+    this.data = null;
+    this.hover = -1;
+
+    container.classList.add('chart');
+    this.canvas = document.createElement('canvas');
+    this.canvas.className = 'chart-canvas';
+    container.appendChild(this.canvas);
+
+    this.tip = document.createElement('div');
+    this.tip.className = 'chart-tip';
+    this.tip.hidden = true;
+    container.appendChild(this.tip);
+
+    this.ctx = this.canvas.getContext('2d');
+
+    var self = this;
+    this._onMove = function (e) { self._pointer(e); };
+    this._onLeave = function () { self.hover = -1; self.tip.hidden = true; self.render(); };
+    container.addEventListener('pointermove', this._onMove);
+    container.addEventListener('pointerleave', this._onLeave);
+
+    this._ro = new ResizeObserver(function () { self.resize(); });
+    this._ro.observe(container);
+    this.resize();
+  }
+
+  Chart.prototype.destroy = function () {
+    this._ro.disconnect();
+    this.container.removeEventListener('pointermove', this._onMove);
+    this.container.removeEventListener('pointerleave', this._onLeave);
+  };
+
+  Chart.prototype.resize = function () {
+    var r = this.container.getBoundingClientRect();
+    var dpr = global.devicePixelRatio || 1;
+    this.w = Math.max(120, r.width);
+    this.h = Math.max(80, r.height);
+    this.canvas.width = Math.round(this.w * dpr);
+    this.canvas.height = Math.round(this.h * dpr);
+    this.canvas.style.width = this.w + 'px';
+    this.canvas.style.height = this.h + 'px';
+    this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    this.render();
+  };
+
+  Chart.prototype.setData = function (data) {
+    this.data = data;
+    this.hover = -1;
+    this.tip.hidden = true;
+    this.render();
+  };
+
+  /* Data → pixel projection. */
+  Chart.prototype._scales = function () {
+    var d = this.data;
+    var pad = Object.assign({}, PAD, d.pad || {});
+    // On a narrow canvas 76px on the left would eat a third of the plot. The
+    // axis label does not fit there anyway (see render), so tick room is
+    // enough. An explicitly supplied pad is never overridden — a chart that
+    // asked for one needs it for long ticks ("90-100 %") or they get clipped.
+    if (this.w < 420) {
+      if (!d.pad || d.pad.left == null) pad.left = Math.min(pad.left, 54);
+      if (!d.pad || d.pad.right == null) pad.right = Math.min(pad.right, 12);
+    }
+    var x0 = pad.left, x1 = this.w - pad.right;
+    var y0 = this.h - pad.bottom, y1 = pad.top;
+
+    var xMin = d.xMin, xMax = d.xMax;
+    var yMin = d.yMin, yMax = d.yMax;
+    var yLog = d.yScale === 'log';
+    var xLog = d.xScale === 'log';
+
+    var sx, sy;
+    if (xLog) {
+      xMin = Math.max(xMin, 1e-12);
+      var lxMin = Math.log10(xMin), lxMax = Math.log10(xMax);
+      if (lxMax - lxMin < 1e-9) lxMax = lxMin + 1;
+      sx = function (v) {
+        var l = Math.log10(Math.max(v, 1e-12));
+        return x0 + ((l - lxMin) / (lxMax - lxMin)) * (x1 - x0);
+      };
+    } else {
+      sx = function (v) { return x0 + ((v - xMin) / (xMax - xMin || 1)) * (x1 - x0); };
+    }
+
+    if (yLog) {
+      yMin = Math.max(yMin, 1e-12);
+      var lyMin = Math.log10(yMin), lyMax = Math.log10(yMax);
+      if (lyMax - lyMin < 1e-9) lyMax = lyMin + 1;
+      sy = function (v) {
+        var l = Math.log10(Math.max(v, 1e-12));
+        return y0 + ((l - lyMin) / (lyMax - lyMin)) * (y1 - y0);
+      };
+    } else {
+      sy = function (v) { return y0 + ((v - yMin) / (yMax - yMin || 1)) * (y1 - y0); };
+    }
+
+    return {
+      pad: pad, x0: x0, x1: x1, y0: y0, y1: y1,
+      isLog: yLog, xIsLog: xLog,
+      xMin: xMin, xMax: xMax, yMin: yMin, yMax: yMax,
+      sx: sx, sy: sy
+    };
+  };
+
+  Chart.prototype.render = function () {
+    var ctx = this.ctx, d = this.data;
+    ctx.clearRect(0, 0, this.w, this.h);
+    if (!d) return;
+
+    var s = this._scales();
+    var grid = css('--gridline'), axis = css('--axis'), muted = css('--text-muted');
+    var surface = css('--surface-1');
+
+    ctx.save();
+
+    /* --- grid and axes --- */
+    var yTicks = d.yTicks
+      ? d.yTicks
+      : s.isLog ? logTicks(s.yMin, s.yMax) : niceTicks(s.yMin, s.yMax, 5).ticks;
+    ctx.strokeStyle = grid; ctx.lineWidth = 1;
+    ctx.font = '11px system-ui, -apple-system, "Segoe UI", sans-serif';
+    ctx.fillStyle = muted;
+    ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+    for (var i = 0; i < yTicks.length; i++) {
+      var py = Math.round(s.sy(yTicks[i])) + 0.5;
+      if (py < s.y1 - 1 || py > s.y0 + 1) continue;
+      ctx.beginPath(); ctx.moveTo(s.x0, py); ctx.lineTo(s.x1, py); ctx.stroke();
+      ctx.fillText((d.fmtY || fmtCompact)(yTicks[i]), s.x0 - 8, py);
+    }
+
+    var xTicks = s.xIsLog
+      ? logTicks(s.xMin, s.xMax)
+      : niceTicks(s.xMin, s.xMax, Math.max(2, Math.floor(this.w / 90))).ticks;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    for (var j = 0; j < xTicks.length; j++) {
+      var px = Math.round(s.sx(xTicks[j])) + 0.5;
+      if (px < s.x0 - 1 || px > s.x1 + 1) continue;
+      ctx.fillText((d.fmtX || fmtCompact)(xTicks[j]), px, s.y0 + 8);
+    }
+
+    ctx.strokeStyle = axis;
+    ctx.beginPath();
+    ctx.moveTo(s.x0, Math.round(s.y0) + 0.5); ctx.lineTo(s.x1, Math.round(s.y0) + 0.5);
+    ctx.stroke();
+
+    /* --- axis labels (on mobile a rotated label will not fit beside ticks) --- */
+    if (d.yLabel && this.w >= 420) {
+      ctx.save(); ctx.translate(13, (s.y0 + s.y1) / 2); ctx.rotate(-Math.PI / 2);
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = muted; ctx.fillText(d.yLabel, 0, 0); ctx.restore();
+    }
+    if (d.xLabel) {
+      ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+      ctx.fillStyle = muted; ctx.fillText(d.xLabel, (s.x0 + s.x1) / 2, this.h - 2);
+    }
+
+    ctx.save();
+    ctx.beginPath(); ctx.rect(s.x0, s.y1 - 4, s.x1 - s.x0, s.y0 - s.y1 + 8); ctx.clip();
+
+    /* --- sloupce (histogram) --- */
+    if (d.bars) this._drawBars(ctx, s, d.bars, surface);
+
+    /* --- horizontal range bars (quantile buckets) --- */
+    if (d.rangeBars) this._drawRangeBars(ctx, s, d.rangeBars, surface);
+
+    /* --- bands --- */
+    if (d.bands) {
+      for (var b = 0; b < d.bands.length; b++) this._drawBand(ctx, s, d.x, d.bands[b]);
+    }
+
+    /* --- spaghetti (sample paths) --- */
+    if (d.spaghetti && d.spaghetti.length) {
+      ctx.strokeStyle = withAlpha(css('--spaghetti'), d.spaghettiAlpha || 0.13);
+      ctx.lineWidth = 1;
+      for (var k = 0; k < d.spaghetti.length; k++) {
+        this._path(ctx, s, d.x, d.spaghetti[k]); ctx.stroke();
+      }
+    }
+
+    /* --- reference lines --- */
+    if (d.refLines) {
+      for (var rl = 0; rl < d.refLines.length; rl++) {
+        var R = d.refLines[rl];
+        ctx.strokeStyle = R.color || axis; ctx.lineWidth = 1;
+        ctx.beginPath();
+        if (R.y != null) {
+          var ry = Math.round(s.sy(R.y)) + 0.5;
+          ctx.moveTo(s.x0, ry); ctx.lineTo(s.x1, ry);
+        } else {
+          var rx = Math.round(s.sx(R.x)) + 0.5;
+          ctx.moveTo(rx, s.y1); ctx.lineTo(rx, s.y0);
+        }
+        ctx.stroke();
+        if (R.label) {
+          ctx.fillStyle = R.color || muted;
+          ctx.font = '10px system-ui, -apple-system, "Segoe UI", sans-serif';
+          if (R.y != null) {
+            ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
+            ctx.fillText(R.label, s.x0 + 4, s.sy(R.y) - 3);
+          } else {
+            ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+            ctx.fillText(R.label, s.sx(R.x) + 4, s.y1 + 2);
+          }
+        }
+      }
+    }
+
+    /* --- lines --- */
+    if (d.lines) {
+      for (var l = 0; l < d.lines.length; l++) {
+        var L = d.lines[l];
+        ctx.strokeStyle = L.color; ctx.lineWidth = L.width || 2;
+        ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+        this._path(ctx, s, d.x, L.y); ctx.stroke();
+      }
+    }
+
+    /* --- markers, ringed in the surface colour --- */
+    if (d.markers) {
+      for (var m = 0; m < d.markers.length; m++) {
+        var M = d.markers[m];
+        var mx = s.sx(M.x), my = s.sy(M.y);
+        ctx.beginPath(); ctx.arc(mx, my, 6, 0, Math.PI * 2);
+        ctx.fillStyle = surface; ctx.fill();
+        ctx.beginPath(); ctx.arc(mx, my, 4.5, 0, Math.PI * 2);
+        ctx.fillStyle = M.color; ctx.fill();
+      }
+    }
+
+    ctx.restore();
+
+    /* --- crosshair (meaningless for horizontal range bars) --- */
+    if (this.hover >= 0 && !d.rangeBars && d.x && this.hover < d.x.length) {
+      var hx = Math.round(s.sx(d.x[this.hover])) + 0.5;
+      ctx.strokeStyle = css('--crosshair'); ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(hx, s.y1); ctx.lineTo(hx, s.y0); ctx.stroke();
+      if (d.lines) {
+        for (var hl = 0; hl < d.lines.length; hl++) {
+          var HL = d.lines[hl];
+          if (HL.y[this.hover] == null || !isFinite(HL.y[this.hover])) continue;
+          var hy = s.sy(HL.y[this.hover]);
+          ctx.beginPath(); ctx.arc(hx, hy, 5.5, 0, Math.PI * 2);
+          ctx.fillStyle = surface; ctx.fill();
+          ctx.beginPath(); ctx.arc(hx, hy, 4, 0, Math.PI * 2);
+          ctx.fillStyle = HL.color; ctx.fill();
+        }
+      }
+    }
+
+    /* --- direct labels at line ends (selectively) --- */
+    if (d.lines && d.directLabels) {
+      ctx.font = '600 11px system-ui, -apple-system, "Segoe UI", sans-serif';
+      ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+      var used = [];
+      for (var dl = d.lines.length - 1; dl >= 0; dl--) {
+        var DL = d.lines[dl];
+        if (!DL.label) continue;
+        var last = DL.y.length - 1;
+        while (last > 0 && !isFinite(DL.y[last])) last--;
+        var ly = s.sy(DL.y[last]);
+        var clash = false;
+        for (var u = 0; u < used.length; u++) if (Math.abs(used[u] - ly) < 13) clash = true;
+        if (clash) continue;
+        used.push(ly);
+        var tw = ctx.measureText(DL.label).width;
+        if (s.x1 - 6 - tw < s.x0) continue;         // nevejde se → nese to legenda
+        ctx.fillStyle = surface; ctx.globalAlpha = 0.82;
+        ctx.fillRect(s.x1 - tw - 9, ly - 8, tw + 8, 16);
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = css('--text-secondary');
+        ctx.fillText(DL.label, s.x1 - 5, ly);
+      }
+    }
+
+    ctx.restore();
+  };
+
+  Chart.prototype._path = function (ctx, s, xs, ys) {
+    ctx.beginPath();
+    var started = false;
+    for (var i = 0; i < ys.length; i++) {
+      var v = ys[i];
+      if (v == null || !isFinite(v)) { started = false; continue; }
+      var px = s.sx(xs[i]), py = s.sy(v);
+      if (!started) { ctx.moveTo(px, py); started = true; } else ctx.lineTo(px, py);
+    }
+  };
+
+  Chart.prototype._drawBand = function (ctx, s, xs, band) {
+    ctx.beginPath();
+    var i;
+    for (i = 0; i < band.hi.length; i++) {
+      var px = s.sx(xs[i]), py = s.sy(band.hi[i]);
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    for (i = band.lo.length - 1; i >= 0; i--) {
+      ctx.lineTo(s.sx(xs[i]), s.sy(band.lo[i]));
+    }
+    ctx.closePath();
+    ctx.fillStyle = withAlpha(band.color, band.alpha == null ? 0.14 : band.alpha);
+    ctx.fill();
+  };
+
+  Chart.prototype._drawBars = function (ctx, s, bars, surface) {
+    var edges = bars.edges, counts = bars.counts;
+    for (var i = 0; i < counts.length; i++) {
+      if (!counts[i]) continue;
+      var xa = s.sx(edges[i]), xb = s.sx(edges[i + 1]);
+      var w = Math.max(1, xb - xa - 2);          // 2px gap in the surface colour
+      var y = s.sy(counts[i]), base = s.sy(0);
+      ctx.fillStyle = bars.colorFn
+        ? bars.colorFn((edges[i] + edges[i + 1]) / 2, i)
+        : bars.color;
+      var hgt = base - y;
+      if (hgt < 0.6) hgt = 0.6;
+      var r = Math.min(3, w / 2, hgt);           // rounded cap, square at the baseline
+      ctx.beginPath();
+      ctx.moveTo(xa + 1, base);
+      ctx.lineTo(xa + 1, y + r);
+      ctx.quadraticCurveTo(xa + 1, y, xa + 1 + r, y);
+      ctx.lineTo(xa + 1 + w - r, y);
+      ctx.quadraticCurveTo(xa + 1 + w, y, xa + 1 + w, y + r);
+      ctx.lineTo(xa + 1 + w, base);
+      ctx.closePath();
+      ctx.fill();
+    }
+  };
+
+  /* A horizontal bar from `lo` to `hi` on row `y`. Used for quantile buckets:
+   * "in this ten-percent band you finished between X and Y". */
+  Chart.prototype._drawRangeBars = function (ctx, s, spec, surface) {
+    var items = spec.items;
+    var rows = items.length;
+    var slot = (s.y0 - s.y1) / rows;
+    // Both dimensions need a floor, not just a cap: a chart rendered into a
+    // collapsed container (a hidden tab, a very short viewport) has slot ~ 0,
+    // which drove the corner radius negative and threw out of roundRect.
+    var h = Math.max(1, Math.min(22, slot - 4));
+
+    for (var i = 0; i < rows; i++) {
+      var it = items[i];
+      var yc = s.y1 + slot * (i + 0.5);
+      var xa = s.sx(it.lo), xb = s.sx(it.hi);
+      var w = Math.max(3, xb - xa);
+      var r = Math.max(0, Math.min(4, h / 2, w / 2));   // rounded ends
+
+      ctx.fillStyle = spec.colorFn ? spec.colorFn(it, i) : spec.color;
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(xa, yc - h / 2, w, h, r);
+      else ctx.rect(xa, yc - h / 2, w, h);
+      ctx.fill();
+
+      // bucket midpoint: a 2px marker ringed in the surface colour
+      if (it.mid != null) {
+        var xm = s.sx(it.mid);
+        ctx.fillStyle = surface;
+        ctx.fillRect(xm - 2, yc - h / 2, 4, h);
+        ctx.fillStyle = C_TEXT();
+        ctx.fillRect(xm - 1, yc - h / 2, 2, h);
+      }
+    }
+  };
+
+  function C_TEXT() { return css('--text-primary'); }
+
+  Chart.prototype._pointer = function (e) {
+    var d = this.data;
+    if (!d || !d.x || !d.x.length) return;
+    var r = this.container.getBoundingClientRect();
+    var mx = e.clientX - r.left, my = e.clientY - r.top;
+    var s = this._scales();
+    var best = 0, bestD = Infinity, i, dd;
+
+    if (d.rangeBars) {
+      // the bars stack vertically → the target is a row, not an x position
+      var rows = d.rangeBars.items.length;
+      var slot = (s.y0 - s.y1) / rows;
+      best = Math.floor((my - s.y1) / slot);
+      if (best < 0 || best >= rows) { this._onLeave(); return; }
+    } else {
+      if (mx < s.x0 - 12 || mx > s.x1 + 12) { this._onLeave(); return; }
+      // nearest index — the reader aims at a position, not at a 2px line
+      for (i = 0; i < d.x.length; i++) {
+        dd = Math.abs(s.sx(d.x[i]) - mx);
+        if (dd < bestD) { bestD = dd; best = i; }
+      }
+    }
+    if (best !== this.hover) { this.hover = best; this.render(); }
+    this._showTip(s, best, my, d.rangeBars ? mx : s.sx(d.x[best]));
+  };
+
+  Chart.prototype._showTip = function (s, idx, py, anchorX) {
+    var d = this.data, tip = this.tip;
+    while (tip.firstChild) tip.removeChild(tip.firstChild);
+
+    var head = document.createElement('div');
+    head.className = 'tip-head';
+    head.textContent = (d.fmtTipX || d.fmtX || fmtCompact)(d.x[idx]);
+    tip.appendChild(head);
+
+    var rows = d.tipRows ? d.tipRows(idx) : (d.lines || []).map(function (L) {
+      return { label: L.label || '', value: (d.fmtTipY || d.fmtY || fmtCompact)(L.y[idx]), color: L.color };
+    });
+
+    for (var i = 0; i < rows.length; i++) {
+      var row = document.createElement('div');
+      row.className = 'tip-row';
+      if (rows[i].color) {
+        var key = document.createElement('span');
+        key.className = 'tip-key';
+        key.style.background = rows[i].color;
+        row.appendChild(key);
+      }
+      var val = document.createElement('span');
+      val.className = 'tip-val';
+      val.textContent = rows[i].value;              // untrusted data → textContent
+      row.appendChild(val);
+      var lab = document.createElement('span');
+      lab.className = 'tip-lab';
+      lab.textContent = rows[i].label;
+      row.appendChild(lab);
+      tip.appendChild(row);
+    }
+
+    tip.hidden = false;
+    var tx = anchorX + 14;
+    if (tx + tip.offsetWidth > this.w - 4) tx = anchorX - tip.offsetWidth - 14;
+    var ty = Math.min(Math.max(py - tip.offsetHeight / 2, 4), this.h - tip.offsetHeight - 4);
+    tip.style.left = Math.max(4, tx) + 'px';
+    tip.style.top = ty + 'px';
+  };
+
+  global.Charts = {
+    mount: function (el, opts) { return new Chart(el, opts); },
+    niceTicks: niceTicks,
+    logTicks: logTicks,
+    fmtCompact: fmtCompact,
+    fmtMoney: fmtMoney,
+    fmtPct: fmtPct,
+    withAlpha: withAlpha,
+    css: css,
+    invalidateColors: invalidateColors
+  };
+})(window);
+
+</script>
+<script>
+/* app.js — state, UI and wiring for both sections. */
+(function () {
+  'use strict';
+
+  var K = window.Kelly, S = window.Sim, C = window.Charts;
+
+  /* ---- utils ----------------------------------------------------------- */
+
+  function $(id) { return document.getElementById(id); }
+  function num(el) { var v = parseFloat(el.value); return isFinite(v) ? v : 0; }
+  function show(el, on) { el.classList.toggle('hidden', !on); }
+
+  function money(v) {
+    if (!isFinite(v)) return '—';
+    var a = Math.abs(v);
+    var d = a >= 1000 ? 0 : a >= 10 ? 1 : 2;
+    return v.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
+  }
+  function count(n) { return n.toLocaleString('en-US'); }
+  function pct(v, d) { return (v * 100).toFixed(d == null ? 2 : d) + ' %'; }
+  /* Growth per ticket lands around 1e-4, which reads terribly in exponential
+   * notation. Everything is therefore shown in basis points: 8.006e-4 → 8.01 bps. */
+  function bps(g) {
+    if (!isFinite(g)) return '—';
+    var v = g * 10000, a = Math.abs(v);
+    return (a < 10 ? v.toFixed(2) : a < 100 ? v.toFixed(1) : v.toFixed(0)) + ' bps';
+  }
+  /* The same for axis ticks — no unit, the axis label carries it. */
+  function bpsAxis(v) {
+    if (!isFinite(v)) return '';
+    if (v === 0) return '0';
+    var b = v * 10000, a = Math.abs(b);
+    return a < 1 ? b.toFixed(2) : a < 10 ? b.toFixed(1) : b.toFixed(0);
+  }
+  /* Growth over 100 tickets — more legible than a bare E[log]. */
+  function per100(g) { return (Math.expm1(g * 100) * 100).toFixed(2) + ' %'; }
+
+  /* Segmented control: returns the current value, calls onChange. */
+  function segment(el, onChange) {
+    var btns = Array.prototype.slice.call(el.querySelectorAll('button'));
+    btns.forEach(function (b) {
+      b.addEventListener('click', function () {
+        btns.forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); });
+        onChange(b.dataset.v);
+      });
+    });
+    return function () {
+      var on = el.querySelector('[aria-pressed="true"]');
+      return on ? on.dataset.v : btns[0].dataset.v;
+    };
+  }
+
+  function callout(kind, html) {
+    var d = document.createElement('div');
+    d.className = 'callout' + (kind ? ' ' + kind : '');
+    var i = document.createElement('span');
+    i.className = 'ico';
+    i.textContent = kind === 'bad' ? '✕' : kind === 'warn' ? '!' : 'i';
+    var b = document.createElement('div');
+    b.className = 'body';
+    b.innerHTML = html;                       // our own strings only, never input data
+    d.appendChild(i); d.appendChild(b);
+    return d;
+  }
+
+  function kpi(label, value, detail, tone) {
+    var d = document.createElement('div');
+    d.className = 'kpi';
+    var k = document.createElement('div'); k.className = 'k'; k.textContent = label;
+    var v = document.createElement('div'); v.className = 'v' + (tone ? ' ' + tone : ''); v.textContent = value;
+    d.appendChild(k); d.appendChild(v);
+    if (detail) { var e = document.createElement('div'); e.className = 'd'; e.textContent = detail; d.appendChild(e); }
+    return d;
+  }
+
+  function legend(el, items) {
+    while (el.firstChild) el.removeChild(el.firstChild);
+    items.forEach(function (it) {
+      var d = document.createElement('div'); d.className = 'legend-item';
+      var k = document.createElement('span');
+      k.className = 'legend-key' + (it.box ? ' box' : '');
+      k.style.background = it.color;
+      var t = document.createElement('span'); t.textContent = it.label;
+      d.appendChild(k); d.appendChild(t); el.appendChild(d);
+    });
+  }
+
+  function table(el, headers, rows) {
+    while (el.firstChild) el.removeChild(el.firstChild);
+    var t = document.createElement('table');
+    var thead = document.createElement('thead'), tr = document.createElement('tr');
+    headers.forEach(function (h) { var th = document.createElement('th'); th.textContent = h; tr.appendChild(th); });
+    thead.appendChild(tr); t.appendChild(thead);
+    var tb = document.createElement('tbody');
+    rows.forEach(function (r) {
+      var trr = document.createElement('tr');
+      r.forEach(function (c) { var td = document.createElement('td'); td.textContent = c; trr.appendChild(td); });
+      tb.appendChild(trr);
+    });
+    t.appendChild(tb); el.appendChild(t);
+  }
+
+  function downloadCsv(name, headers, rows) {
+    var lines = [headers.join(',')].concat(rows.map(function (r) {
+      return r.map(function (c) { return /[",\n]/.test(String(c)) ? '"' + String(c).replace(/"/g, '""') + '"' : c; }).join(',');
+    }));
+    var blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    document.body.appendChild(a); a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 0);
+  }
+
+  /* ---- perspective ------------------------------------------------------
+   *
+   * Which side of the ticket you are on governs BOTH tabs, so it lives here
+   * rather than inside either of them. Every label that would otherwise
+   * quietly assume you are the seller is rewritten from this one place.
+   */
+
+  var side = 'sell';
+  var perspectiveListeners = [];
+  function isSell() { return side !== 'buy'; }
+  function onPerspective(fn) { perspectiveListeners.push(fn); }
+
+  function applyPerspectiveLabels() {
+    var sell = isSell();
+
+    $('perspNote').innerHTML = sell
+      ? 'You win when the combo <strong>misses</strong>.'
+      : 'You win when the combo <strong>hits</strong>.';
+
+    $('q_markupLabel').textContent = sell ? 'Markup over fair' : 'Discount below fair';
+    $('q_markupNote').textContent = sell
+      ? 'left: %, right: the resulting sale price'
+      : 'left: %, right: the resulting buy price';
+    $('q_priceLabel').textContent = sell
+      ? 'Sale price (what you sell it at)'
+      : 'Buy price (what you pay)';
+    $('q_premiumLabel').textContent = sell ? 'Premium collected' : 'Profit if it hits';
+    $('q_haircutNote').innerHTML = sell
+      ? 'Positive = the combo hits more often than the product of legs says, so your edge is <strong>smaller</strong>. Leg prices carry a spread, so reality tends to sit below the product — but Kelly is dangerous mainly when the edge is overestimated.'
+      : 'Positive = the combo hits more often than the product of legs says, so your edge is <strong>larger</strong>. As a buyer the danger is the other way: drag the slider negative to see what happens when the combo lands less often than you assumed.';
+
+    $('r_markupLabel').textContent = sell
+      ? 'Your edge (markup over fair)'
+      : 'Your edge (discount below fair)';
+    $('r_mirrorCLabel').textContent = sell ? 'sale price' : 'buy price';
+    $('r_heroLabel').textContent = sell
+      ? 'Kelly per ticket — constant across the whole band at a fixed edge'
+      : 'Kelly per ticket — at the balanced end of the band';
+  }
+
+  var getPerspective = segment($('perspective'), function (v) {
+    side = v;
+    applyPerspectiveLabels();
+    perspectiveListeners.forEach(function (fn) { fn(v); });
+  });
+
+  /* ---- theme and tabs ---------------------------------------------------- */
+
+  var charts = [];
+  function redrawAll() { C.invalidateColors(); charts.forEach(function (c) { c.render(); }); }
+
+  $('themeToggle').addEventListener('click', function () {
+    var root = document.documentElement;
+    root.dataset.theme = root.dataset.theme === 'light' ? 'dark' : 'light';
+    document.querySelector('meta[name=theme-color]').setAttribute(
+      'content', root.dataset.theme === 'light' ? '#f9f9f7' : '#0d0d0d');
+    redrawAll();
+  });
+
+  Array.prototype.forEach.call(document.querySelectorAll('.tab'), function (tab) {
+    tab.addEventListener('click', function () {
+      Array.prototype.forEach.call(document.querySelectorAll('.tab'), function (t) {
+        t.setAttribute('aria-selected', String(t === tab));
+      });
+      Array.prototype.forEach.call(document.querySelectorAll('.view'), function (v) {
+        v.classList.toggle('active', v.id === 'view-' + tab.dataset.view);
+      });
+      setTimeout(function () { charts.forEach(function (c) { c.resize(); }); }, 0);
+    });
+  });
+
+  function mount(id) { var c = C.mount($(id)); charts.push(c); return c; }
+
+  /* Every run gets a fresh random seed — otherwise you would stare at one and
+   * the same path and never notice how much of the result is just luck. The
+   * lock holds it when you want to repeat a run unchanged. */
+  function randomSeed() { return Math.floor(Math.random() * 4294967296); }
+
+  function wireSeed(prefix) {
+    $(prefix + '_seed').value = randomSeed();
+  }
+
+  /* Returns the seed for this run and writes it back so it is visible. */
+  function nextSeed(prefix) {
+    var input = $(prefix + '_seed');
+    if (!$(prefix + '_seedLock').checked) input.value = randomSeed();
+    var v = Math.round(num(input));
+    return v >= 0 ? v : randomSeed();
+  }
+
+  /* ---- shared drawing ---------------------------------------------------- */
+
+  /* Fan chart: percentile bands in one hue (magnitude of certainty), with
+   * median and mean as two distinguished series. */
+  function fanData(res, logAxis, B0) {
+    var x = Array.prototype.slice.call(res.checkpoints);
+    var b = res.bands;
+    var s1 = C.css('--series-1'), s2 = C.css('--series-2');
+
+    var lo = Infinity, hi = -Infinity;
+    for (var i = 0; i < x.length; i++) {
+      lo = Math.min(lo, b.p5[i]);
+      hi = Math.max(hi, b.p95[i], b.mean[i]);
+    }
+    lo = Math.min(lo, B0); hi = Math.max(hi, B0);
+    if (logAxis) { lo = Math.max(lo * 0.75, B0 * 1e-6); hi = hi * 1.3; }
+    else { var padv = (hi - lo) * 0.08; lo = Math.max(0, lo - padv); hi = hi + padv; }
+
+    return {
+      x: x, xMin: x[0], xMax: x[x.length - 1],
+      yMin: lo, yMax: hi, yScale: logAxis ? 'log' : 'linear',
+      xLabel: 'ticket', yLabel: 'bankroll',
+      fmtY: C.fmtCompact, fmtX: function (v) { return v.toFixed(0); },
+      fmtTipX: function (v) { return 'after ticket ' + v.toFixed(0); },
+      spaghetti: res.samplePaths.slice(0, 60),
+      spaghettiAlpha: 0.10,
+      bands: [
+        { lo: b.p5, hi: b.p95, color: s1, alpha: 0.10 },
+        { lo: b.p25, hi: b.p75, color: s1, alpha: 0.20 }
+      ],
+      lines: [
+        { y: b.mean, color: s2, width: 2, label: 'mean' },
+        { y: b.p50, color: s1, width: 2, label: 'median' }
+      ],
+      refLines: [{ y: B0, color: C.css('--axis'), label: 'starting bankroll' }],
+      tipRows: function (i) {
+        return [
+          { label: 'p95', value: money(b.p95[i]), color: C.withAlpha(s1, 0.45) },
+          { label: 'p75', value: money(b.p75[i]), color: C.withAlpha(s1, 0.7) },
+          { label: 'median', value: money(b.p50[i]), color: s1 },
+          { label: 'mean', value: money(b.mean[i]), color: s2 },
+          { label: 'p25', value: money(b.p25[i]), color: C.withAlpha(s1, 0.7) },
+          { label: 'p5', value: money(b.p5[i]), color: C.withAlpha(s1, 0.45) }
+        ];
+      }
+    };
+  }
+
+  function fanLegend(el) {
+    legend(el, [
+      { color: C.css('--series-1'), label: 'median' },
+      { color: C.css('--series-2'), label: 'mean' },
+      { color: C.withAlpha(C.css('--series-1'), 0.35), label: 'p25–p75', box: true },
+      { color: C.withAlpha(C.css('--series-1'), 0.18), label: 'p5–p95', box: true },
+      { color: C.withAlpha(C.css('--spaghetti'), 0.35), label: '60 sample paths' }
+    ]);
+  }
+
+  /* Distribution of the final bankroll — diverging around the starting one.
+   * The "lost money / made money" polarity here is real, not decoration. */
+  function histData(res, B0) {
+    var h = S.histogram(res.finals, 46, true);
+    var centers = [];
+    for (var i = 0; i < h.counts.length; i++) centers.push(Math.sqrt(h.edges[i] * h.edges[i + 1]));
+    var pos = C.css('--div-pos'), neg = C.css('--div-neg');
+    var maxC = 0;
+    for (var j = 0; j < h.counts.length; j++) maxC = Math.max(maxC, h.counts[j]);
+
+    return {
+      x: centers, xMin: h.edges[0], xMax: h.edges[h.edges.length - 1], xScale: 'log',
+      yMin: 0, yMax: maxC * 1.1,
+      xLabel: 'final bankroll', yLabel: 'simulations',
+      fmtX: C.fmtCompact, fmtY: C.fmtCompact,
+      fmtTipX: function (v) { return money(v); },
+      bars: {
+        edges: h.edges, counts: h.counts,
+        colorFn: function (center) { return center < B0 ? neg : pos; }
+      },
+      refLines: [{ x: B0, color: C.css('--text-muted'), label: 'start' }],
+      tipRows: function (i) {
+        return [
+          { label: 'simulations', value: h.counts[i].toFixed(0), color: centers[i] < B0 ? neg : pos },
+          { label: 'share', value: pct(h.counts[i] / res.finals.length, 2) }
+        ];
+      }
+    };
+  }
+
+  /* Distribution of max drawdown — one hue, magnitude only. */
+  function ddData(res) {
+    var h = S.histogram(res.maxDrawdowns, 40, false);
+    var centers = [];
+    for (var i = 0; i < h.counts.length; i++) centers.push((h.edges[i] + h.edges[i + 1]) / 2);
+    var maxC = 0;
+    for (var j = 0; j < h.counts.length; j++) maxC = Math.max(maxC, h.counts[j]);
+    return {
+      x: centers, xMin: h.edges[0], xMax: h.edges[h.edges.length - 1],
+      yMin: 0, yMax: maxC * 1.1,
+      xLabel: 'max drawdown', yLabel: 'simulations',
+      fmtX: function (v) { return (v * 100).toFixed(0) + ' %'; },
+      fmtY: C.fmtCompact,
+      fmtTipX: function (v) { return pct(v, 1) + ' drawdown'; },
+      bars: { edges: h.edges, counts: h.counts, color: C.css('--series-1') },
+      refLines: [
+        { x: res.stats.maxDDMedian, color: C.css('--text-muted'), label: 'median' },
+        { x: res.stats.maxDDp95, color: C.css('--critical'), label: 'p95' }
+      ],
+      tipRows: function (i) {
+        return [{ label: 'simulations', value: h.counts[i].toFixed(0), color: C.css('--series-1') }];
+      }
+    };
+  }
+
+  /* Quantile buckets: each band = 10 % of simulations. Answers "where did I
+   * end up in this share of cases" directly. */
+  function decileData(res, B0) {
+    var bk = S.buckets(res.finals, 10);
+    var pos = C.css('--div-pos'), neg = C.css('--div-neg');
+    var lo = Infinity, hi = -Infinity;
+    bk.forEach(function (b) { lo = Math.min(lo, b.lo); hi = Math.max(hi, b.hi); });
+    lo = Math.min(lo, B0) * 0.85; hi = Math.max(hi, B0) * 1.15;
+
+    var idx = bk.map(function (_, i) { return i; });
+    return {
+      x: idx, xMin: lo, xMax: hi, xScale: 'log',
+      // the axis is inverted: bucket 0 (the worst 10 %) belongs at the top,
+      // because the bars are drawn downwards and the labels must line up
+      yMin: bk.length, yMax: 0,
+      yTicks: idx.map(function (i) { return i + 0.5; }),
+      xLabel: 'final bankroll', pad: { left: 92, bottom: 42, top: 14, right: 20 },
+      fmtX: C.fmtCompact,
+      fmtY: function (v) {
+        var i = Math.floor(v);
+        return (i * 10) + '–' + (i * 10 + 10) + ' %';
+      },
+      fmtTipX: function (i) { return 'percentile ' + (i * 10) + '–' + (i * 10 + 10) + ' %'; },
+      rangeBars: {
+        items: bk,
+        colorFn: function (b) { return b.mid < B0 ? neg : pos; }
+      },
+      refLines: [{ x: B0, color: C.css('--text-muted'), label: 'start' }],
+      tipRows: function (i) {
+        var b = bk[i];
+        return [
+          { label: 'from', value: money(b.lo), color: b.mid < B0 ? neg : pos },
+          { label: 'to', value: money(b.hi) },
+          { label: 'midpoint', value: money(b.mid) },
+          { label: 'multiple of start', value: (b.mid / B0).toFixed(2) + '×' }
+        ];
+      }
+    };
+  }
+
+  /* Quantile curve: percentile → final bankroll. */
+  function quantData(res, B0) {
+    var qc = S.quantileCurve(res.finals, 101);
+    var xs = Array.prototype.slice.call(qc.pcts);
+    var ys = Array.prototype.slice.call(qc.values);
+    var lo = Math.min(ys[2], B0) * 0.9, hi = Math.max(ys[98], B0) * 1.1;
+    return {
+      x: xs, xMin: 0, xMax: 100, yMin: lo, yMax: hi, yScale: 'log',
+      xLabel: 'percentile', yLabel: 'final bankroll',
+      fmtX: function (v) { return v.toFixed(0) + ' %'; },
+      fmtY: C.fmtCompact,
+      fmtTipX: function (v) { return 'percentile ' + v.toFixed(0) + ' %'; },
+      lines: [{ y: ys, color: C.css('--series-1'), width: 2, label: 'final bankroll' }],
+      refLines: [{ y: B0, color: C.css('--text-muted'), label: 'start' }],
+      markers: [5, 25, 50, 75, 95].map(function (p) {
+        return { x: p, y: S.percentileSorted(res.finals, p), color: C.css('--series-1') };
+      }),
+      tipRows: function (i) {
+        return [
+          { label: 'final bankroll', value: money(ys[i]), color: C.css('--series-1') },
+          { label: 'multiple of start', value: (ys[i] / B0).toFixed(2) + '×' },
+          { label: 'worse runs', value: xs[i].toFixed(0) + ' %' }
+        ];
+      }
+    };
+  }
+
+  /* Trade log of one specific path. */
+  function renderLog(el, infoEl, cfg, res, pctile, B0) {
+    var idx = S.indexAtPercentile(res.finalsRaw, res.finals, pctile);
+    var rep = S.replay(cfg, idx);
+    var played = rep.log.filter(function (t) { return !t.skipped; });
+    var wins = played.filter(function (t) { return t.win; }).length;
+    var sell = (cfg.side || 'sell') !== 'buy';
+
+    infoEl.textContent = 'simulation #' + idx + ' · ' + played.length + ' tickets · '
+      + wins + ' wins (' + (played.length ? (wins / played.length * 100).toFixed(1) : '0') + ' %) · '
+      + 'ended at ' + money(rep.final) + ' (' + (rep.final / B0).toFixed(2) + '× start)'
+      + (rep.ruined ? ' · RUIN' : '');
+
+    var t = document.createElement('table');
+    var thead = document.createElement('thead'), htr = document.createElement('tr');
+    ['#', 'p(combo)', 'price', 'contracts', 'at risk', sell ? 'premium' : 'max win',
+      'outcome', 'P/L', 'bankroll'].forEach(function (h) {
+      var th = document.createElement('th'); th.textContent = h; htr.appendChild(th);
+    });
+    thead.appendChild(htr); t.appendChild(thead);
+
+    var tb = document.createElement('tbody');
+    played.forEach(function (r) {
+      var tr = document.createElement('tr');
+      tr.className = r.win ? 'win' : 'loss';
+      var hit = sell ? !r.win : r.win;
+      var cells = [
+        String(r.ticket),
+        (r.pModel * 100).toFixed(1) + ' %',
+        r.price.toFixed(4),
+        r.contracts.toFixed(1),
+        money(r.liability),
+        money(r.premium),
+        hit ? 'combo hit' : 'combo missed',
+        (r.pnl >= 0 ? '+' : '') + money(r.pnl),
+        money(r.bankroll)
+      ];
+      cells.forEach(function (c, i) {
+        var td = document.createElement('td');
+        td.textContent = c;
+        if (i === 7) td.className = r.pnl >= 0 ? 'pos' : 'neg';
+        tr.appendChild(td);
+      });
+      tb.appendChild(tr);
+    });
+    t.appendChild(tb);
+
+    while (el.firstChild) el.removeChild(el.firstChild);
+    el.appendChild(t);
+    return { index: idx, log: played };
+  }
+
+  function statKpis(el, res, B0, gAnalytic) {
+    while (el.firstChild) el.removeChild(el.firstChild);
+    var st = res.stats;
+    el.appendChild(kpi('Median final bankroll', money(st.medianFinal),
+      (st.medianFinal / B0).toFixed(2) + '× start', st.medianFinal >= B0 ? 'pos' : 'neg'));
+    el.appendChild(kpi('Mean', money(st.meanFinal), (st.meanFinal / B0).toFixed(2) + '× start'));
+    el.appendChild(kpi('p5 — bad case', money(st.p5), (st.p5 / B0).toFixed(2) + '× start',
+      st.p5 < B0 ? 'neg' : ''));
+    el.appendChild(kpi('p95 — good case', money(st.p95), (st.p95 / B0).toFixed(2) + '× start'));
+    el.appendChild(kpi('Ends below start', pct(st.pctBelowStart, 1), 'of ' + count(res.finals.length) + ' simulations',
+      st.pctBelowStart > 0.4 ? 'neg' : ''));
+    el.appendChild(kpi('Ruin', pct(st.pctRuined, 2), 'below the ruin threshold', st.pctRuined > 0.001 ? 'neg' : 'pos'));
+    el.appendChild(kpi('Max drawdown — median', pct(st.maxDDMedian, 1),
+      'from a peak, over ' + res.totalTickets + ' tickets · p95: ' + pct(st.maxDDp95, 1),
+      st.maxDDMedian > 0.5 ? 'neg' : ''));
+    el.appendChild(kpi('Ever below 50 % of start', pct(st.pctEverBelow50, 1),
+      'below 25 %: ' + pct(st.pctEverBelow25, 1), st.pctEverBelow50 > 0.3 ? 'neg' : ''));
+    el.appendChild(kpi('Total turnover', money(st.meanTurnover),
+      (st.meanTurnover / B0).toFixed(0) + '× bankroll · money that has to change hands'));
+    el.appendChild(kpi('Growth per ticket', bps(st.meanLogGrowthPerTicket),
+      gAnalytic != null ? 'analytically ' + bps(gAnalytic) : 'from Monte Carlo'));
+    el.appendChild(kpi('Growth over 100 tickets', per100(st.meanLogGrowthPerTicket), 'compounded'));
+  }
+
+  function statTable(el, res, B0) {
+    var st = res.stats;
+    table(el, ['Quantity', 'Value', 'Multiple of start'], [
+      ['Worst', money(st.worst), (st.worst / B0).toFixed(3) + '×'],
+      ['p5', money(st.p5), (st.p5 / B0).toFixed(3) + '×'],
+      ['p25', money(st.p25), (st.p25 / B0).toFixed(3) + '×'],
+      ['Median', money(st.medianFinal), (st.medianFinal / B0).toFixed(3) + '×'],
+      ['p75', money(st.p75), (st.p75 / B0).toFixed(3) + '×'],
+      ['p95', money(st.p95), (st.p95 / B0).toFixed(3) + '×'],
+      ['Best', money(st.best), (st.best / B0).toFixed(3) + '×'],
+      ['Mean', money(st.meanFinal), (st.meanFinal / B0).toFixed(3) + '×'],
+      ['Ends below start', pct(st.pctBelowStart, 2), '—'],
+      ['Ruin', pct(st.pctRuined, 3), '—'],
+      ['Max drawdown from a peak — median', pct(st.maxDDMedian, 2), '—'],
+      ['Max drawdown from a peak — p95', pct(st.maxDDp95, 2), '—'],
+      ['Total turnover', money(st.meanTurnover), (st.meanTurnover / B0).toFixed(1) + '×'],
+      ['Ever below 50 % of start', pct(st.pctEverBelow50, 2), '—'],
+      ['Ever below 25 % of start', pct(st.pctEverBelow25, 2), '—'],
+      ['Growth per ticket', bps(st.meanLogGrowthPerTicket), '—'],
+      ['Growth over 100 tickets', per100(st.meanLogGrowthPerTicket), '—'],
+      ['Tickets per path', String(res.totalTickets), '—'],
+      ['Simulations', count(res.finals.length), '—']
+    ]);
+  }
+
+  function csvRows(res) {
+    var rows = [];
+    var b = res.bands;
+    for (var i = 0; i < res.checkpoints.length; i++) {
+      rows.push([res.checkpoints[i], b.p5[i].toFixed(2), b.p25[i].toFixed(2),
+        b.p50[i].toFixed(2), b.p75[i].toFixed(2), b.p95[i].toFixed(2), b.mean[i].toFixed(2)]);
+    }
+    return rows;
+  }
+
+  /* Sizing comparison. In a single run the modes are MUTUALLY EXCLUSIVE — you
+   * bet by one rule. Seeing them side by side on the same randomness is still
+   * worth it, which is what this does: same seed, same tickets, different stake. */
+  var CMP_VARIANTS = [
+    { key: 'full', label: 'full Kelly', sizing: { type: 'kelly', mult: 1 }, slot: '--series-1' },
+    { key: 'half', label: '½ Kelly', sizing: { type: 'kelly', mult: 0.5 }, slot: '--series-2' },
+    { key: 'quarter', label: '¼ Kelly', sizing: { type: 'kelly', mult: 0.25 }, slot: '--series-3' },
+    { key: 'flat', label: 'flat 2 % of bankroll', sizing: { type: 'flatPct', pct: 0.02 }, slot: '--series-4' }
+  ];
+
+  function runComparison(baseCfg, chart, legendEl, tableEl, onProgress) {
+    var B0 = baseCfg.bankroll;
+    var jobs = CMP_VARIANTS.map(function (v) {
+      var cfg = Object.assign({}, baseCfg, { sizing: v.sizing });
+      delete cfg.onDone;
+      return { v: v, cfg: cfg };
+    });
+
+    var results = [];
+    return jobs.reduce(function (chain, job, i) {
+      return chain.then(function () {
+        return S.run(job.cfg, function (p) {
+          if (onProgress) onProgress((i + p) / jobs.length);
+        }).then(function (res) { results.push({ v: job.v, res: res }); });
+      });
+    }, Promise.resolve()).then(function () {
+      var x = Array.prototype.slice.call(results[0].res.checkpoints);
+      var lo = Infinity, hi = -Infinity;
+      results.forEach(function (r) {
+        for (var i = 0; i < x.length; i++) {
+          lo = Math.min(lo, r.res.bands.geo[i]);
+          hi = Math.max(hi, r.res.bands.geo[i]);
+        }
+      });
+      lo = Math.min(lo, B0) * 0.98; hi = Math.max(hi, B0) * 1.02;
+
+      chart.setData({
+        // Geometric mean, not median: with a flat stake the median jumps
+        // between discrete atoms and the sawtooth would only obscure things.
+        x: x, xMin: x[0], xMax: x[x.length - 1], yMin: lo, yMax: hi, yScale: 'log',
+        xLabel: 'ticket', yLabel: 'typical bankroll (geometric mean)',
+        fmtY: C.fmtCompact, fmtX: function (v) { return v.toFixed(0); },
+        fmtTipX: function (v) { return 'after ticket ' + v.toFixed(0); },
+        lines: results.map(function (r) {
+          return { y: r.res.bands.geo, color: C.css(r.v.slot), width: 2, label: r.v.label };
+        }),
+        refLines: [{ y: B0, color: C.css('--axis'), label: 'start' }],
+        directLabels: true,                      // mandatory once there are 4 series
+        tipRows: function (i) {
+          return results.map(function (r) {
+            return { label: r.v.label, value: money(r.res.bands.geo[i]), color: C.css(r.v.slot) };
+          });
+        }
+      });
+
+      legend(legendEl, results.map(function (r) {
+        return { color: C.css(r.v.slot), label: r.v.label };
+      }));
+
+      table(tableEl,
+        ['Sizing', 'Risk/ticket', 'Median', 'p5', 'Below start', 'maxDD from peak', 'Below 50 % of start', 'Growth/ticket'],
+        results.map(function (r) {
+          var s = r.res.stats;
+          var f = r.v.sizing.type === 'flatPct'
+            ? pct(r.v.sizing.pct, 2)
+            : pct(K.clamp(baseCfg._fStar * r.v.sizing.mult, 0, 1), 2);
+          return [r.v.label, f, money(s.medianFinal), money(s.p5),
+            pct(s.pctBelowStart, 1), pct(s.maxDDMedian, 1), pct(s.pctEverBelow50, 1),
+            bps(s.meanLogGrowthPerTicket)];
+        }));
+
+      return results;
+    });
+  }
+
+  /* Sizing config read off the panel. */
+  function readSizing(prefix, sizingVal) {
+    if (sizingVal === 'flatPct') return { type: 'flatPct', pct: num($(prefix + '_flatPct')) / 100 };
+    if (sizingVal === 'flatAbs') return { type: 'flatAbs', amount: num($(prefix + '_flatAbs')) };
+    return { type: 'kelly', mult: num($(prefix + '_mult')) };
+  }
+
+  function wireSizing(prefix) {
+    var get = segment($(prefix + '_sizing'), function (v) {
+      show($(prefix + '_multField'), v === 'kelly');
+      show($(prefix + '_flatPctField'), v === 'flatPct');
+      show($(prefix + '_flatAbsField'), v === 'flatAbs');
+    });
+    $(prefix + '_mult').addEventListener('input', function () {
+      $(prefix + '_multOut').textContent = num($(prefix + '_mult')).toFixed(2) + '×';
+    });
+    return get;
+  }
+
+  /* Results already on screen belong to the side they were run on. Flipping
+   * perspective must not leave them sitting there looking current — that is
+   * exactly the "the tool quietly shows you the other side" trap. */
+  function markStale(prefix, resultsEl) {
+    if (!resultsEl.dataset.hasRun) return;
+    resultsEl.classList.add('stale');
+    $(prefix + '_state').textContent = 'side changed — run again to refresh the results below';
+  }
+
+  /* Progress handling for a simulation run. */
+  function runner(prefix, resultsEl, build) {
+    var btn = $(prefix + '_run'), prog = $(prefix + '_prog'), state = $(prefix + '_state');
+    var busy = false;
+    btn.addEventListener('click', function () {
+      if (busy) return;
+      var cfg;
+      nextSeed(prefix);                      // new seed before build() reads it
+      try { cfg = build(); } catch (e) { state.textContent = e.message; return; }
+      busy = true;
+      btn.disabled = true;
+      resultsEl.classList.add('busy');
+      state.textContent = 'running ' + count(cfg.sims) + ' simulations × ' + cfg.tickets + ' tickets…';
+      prog.style.width = '0%';
+      var t0 = performance.now();
+      S.run(cfg, function (p) { prog.style.width = (p * 100).toFixed(1) + '%'; })
+        .then(function (res) {
+          cfg.onDone(res);
+          resultsEl.classList.remove('stale');
+          resultsEl.dataset.hasRun = '1';
+          state.textContent = 'done in ' + Math.round(performance.now() - t0) + ' ms · seed ' + cfg.seed;
+        })
+        .catch(function (e) { state.textContent = 'error: ' + e.message; })
+        .then(function () {
+          busy = false; btn.disabled = false;
+          resultsEl.classList.remove('busy');
+          prog.style.width = '0%';
+        });
+    });
+  }
+
+  /* ══════════════════ SECTION 1 — a single ticket ══════════════════ */
+
+  (function quoteView() {
+    var legsEl = $('q_legs');
+    var legs = [0.5, 0.5];
+    var lastRes = null;
+
+    var chFan = mount('q_fan'), chHist = mount('q_hist'), chDD = mount('q_dd');
+    var chCurve = mount('q_curve'), chSens = mount('q_sens');
+    var chDec = mount('q_deciles'), chQuant = mount('q_quant'), chCmp = mount('q_cmp');
+    var lastCfg = null, lastLog = null;
+
+    function renderLegs() {
+      while (legsEl.firstChild) legsEl.removeChild(legsEl.firstChild);
+      legs.forEach(function (v, i) {
+        var row = document.createElement('div'); row.className = 'leg';
+        var idx = document.createElement('span'); idx.className = 'idx'; idx.textContent = 'leg ' + (i + 1);
+        var inp = document.createElement('input');
+        inp.type = 'number'; inp.step = '0.001'; inp.min = '0.0001'; inp.max = '0.9999'; inp.value = v;
+        inp.addEventListener('input', function () { legs[i] = parseFloat(inp.value); update(); });
+        var del = document.createElement('button');
+        del.type = 'button'; del.textContent = '×'; del.title = 'remove leg';
+        del.addEventListener('click', function () {
+          if (legs.length <= 1) return;
+          legs.splice(i, 1); renderLegs(); update();
+        });
+        row.appendChild(idx); row.appendChild(inp); row.appendChild(del);
+        legsEl.appendChild(row);
+      });
+    }
+
+    $('q_addLeg').addEventListener('click', function () { legs.push(0.7); renderLegs(); update(); });
+
+    $('q_manualProduct').addEventListener('change', function () {
+      var on = $('q_manualProduct').checked;
+      show($('q_legsWrap'), !on);
+      show($('q_productWrap'), on);
+      update();
+    });
+
+    var getPriceMode = segment($('q_priceMode'), function (v) {
+      show($('q_markupField'), v === 'markup');
+      show($('q_priceField'), v === 'explicit');
+      update();
+    });
+
+    onPerspective(function () { update(); markStale('q', $('q_results')); });
+
+    var getSizing = wireSizing('q');
+
+    ['q_bankroll', 'q_product', 'q_markup', 'q_price', 'q_haircut', 'q_mult',
+      'q_flatPct', 'q_flatAbs', 'q_cap'].forEach(function (id) {
+      $(id).addEventListener('input', update);
+    });
+    $('q_round').addEventListener('change', update);
+    $('q_log').addEventListener('change', function () {
+      if (lastRes) chFan.setData(fanData(lastRes, $('q_log').checked, num($('q_bankroll'))));
+    });
+
+    /* Current state of the ticket, read off the panel. */
+    function readQuote() {
+      var pAsk = $('q_manualProduct').checked ? num($('q_product')) : K.askProduct(legs);
+      var c;
+      if (getPriceMode() === 'markup') {
+        c = K.priceFromEdge(pAsk, num($('q_markup')) / 100, side);
+        $('q_priceShow').value = isFinite(c) ? c.toFixed(4) : '';
+      } else {
+        c = num($('q_price'));
+        var e = K.edgeFromPrice(pAsk, c, side);
+        $('q_markupShow').value = isFinite(e) ? (e * 100).toFixed(2) : '';
+      }
+      var pTrue = K.clamp(pAsk * (1 + num($('q_haircut')) / 100), 1e-9, 1 - 1e-9);
+      return { pAsk: pAsk, price: c, side: side, pTrue: pTrue, bankroll: num($('q_bankroll')) };
+    }
+
+    function update() {
+      var q = readQuote();
+      var sell = isSell();
+      $('q_productOut').textContent = isFinite(q.pAsk) ? q.pAsk.toFixed(4) : '—';
+      $('q_pOut').textContent = isFinite(q.pAsk) ? (q.pAsk * 100).toFixed(2) + ' %' : '—';
+      $('q_haircutOut').textContent = num($('q_haircut')).toFixed(1) + ' %';
+
+      var box = $('q_callouts');
+      while (box.firstChild) box.removeChild(box.firstChild);
+
+      if (!isFinite(q.pAsk) || q.pAsk <= 0 || q.pAsk >= 1 || !isFinite(q.price) || q.price <= 0 || q.price >= 1) {
+        $('q_heroF').textContent = '—';
+        $('q_heroNote').textContent = 'Enter valid leg prices (0–1) and a ticket price.';
+        return;
+      }
+
+      var sizingVal = getSizing();
+      var mult = sizingVal === 'kelly' ? num($('q_mult')) : 1;
+      var cap = num($('q_cap')) / 100;
+
+      // sized from the model (product of legs), resolved against reality
+      var tModel = K.ticketParams(q.pAsk, q.price, q.side);
+      var tTrue = K.ticketParams(q.pTrue, q.price, q.side);
+      var a = K.analyseTicket({
+        p: q.pAsk, price: q.price, side: q.side, bankroll: q.bankroll,
+        kellyMultiplier: mult, capFraction: cap, roundContracts: $('q_round').checked
+      });
+
+      var applied = a.appliedFraction;
+      if (sizingVal === 'flatPct') applied = Math.min(num($('q_flatPct')) / 100, cap);
+      if (sizingVal === 'flatAbs') applied = Math.min(num($('q_flatAbs')) / q.bankroll, cap);
+
+      var maxLoss = q.bankroll * applied;
+      var contracts = tModel.riskPerContract > 0 ? maxLoss / tModel.riskPerContract : 0;
+      if ($('q_round').checked) { contracts = Math.floor(contracts); maxLoss = contracts * tModel.riskPerContract; }
+
+      var gReal = K.growthRate({ b: tModel.b, winProb: tTrue.winProb, lossProb: tTrue.lossProb }, applied);
+
+      $('q_heroF').textContent = pct(applied, 2);
+      $('q_heroNote').textContent = sizingVal === 'kelly'
+        ? 'full Kelly ' + pct(a.fullKellyFraction, 2) + ' × ' + mult.toFixed(2) +
+          (a.capHit ? ' · limited by the cap' : '')
+        : 'manual sizing · full Kelly would be ' + pct(a.fullKellyFraction, 2);
+
+      $('q_maxLoss').textContent = money(maxLoss);
+      $('q_contracts').textContent = money(contracts);
+      // At high leg prices this comes out enormous against the bankroll — it is
+      // the hardest practical constraint, so it belongs right next to the money.
+      var premium = contracts * tModel.gainPerContract;
+      $('q_premium').textContent = money(premium) +
+        (q.bankroll > 0 ? '  (' + pct(premium / q.bankroll, 0) + ' of bankroll)' : '');
+      // EV as a share of the gain is the invariant m/(1+m) — independent of the
+      // ticket price. That is your edge; absolute EV moves only with turnover.
+      var evTotal = contracts * tTrue.evPerContract;
+      $('q_ev').textContent = money(evTotal) +
+        (premium > 0 ? '  (' + pct(evTotal / premium, 2) + (sell ? ' of premium)' : ' of max win)') : '');
+      $('q_growth').textContent = bps(gReal);
+      $('q_k0').textContent = isFinite(a.zeroGrowthMultiple) ? a.zeroGrowthMultiple.toFixed(3) + '× Kelly' : '—';
+
+      /* --- warnings --- */
+      if (!tTrue.hasEdge) {
+        box.appendChild(callout('bad',
+          'At this price you have <strong>no edge</strong> — EV per contract is ' +
+          tTrue.evPerContract.toFixed(4) + '. Breakeven price is ' + tModel.breakevenPrice.toFixed(4) + '.'));
+      } else {
+        var tol = K.edgeTolerance(q.pAsk, q.price, q.side, mult || 1);
+        if (isFinite(tol.relativeMargin)) {
+          box.appendChild(callout(Math.abs(tol.relativeMargin) < 0.03 ? 'warn' : '',
+            'You are sizing from the product of legs. If the combo actually hit just <strong>' +
+            Math.abs(tol.relativeMargin * 100).toFixed(2) + ' %</strong> ' +
+            (sell ? 'more' : 'less') + ' often in relative terms (p = ' +
+            tol.pBreak.toFixed(4) + ' instead of ' + q.pAsk.toFixed(4) + '), growth would fall to zero. ' +
+            'Half Kelly widens that margin; full Kelly has the narrowest.'));
+        }
+      }
+      if (applied > 0 && a.dd50 > 0.2) {
+        box.appendChild(callout(a.dd50 > 0.6 ? 'warn' : '',
+          'Probability the bankroll ever falls below <strong>half its starting value</strong>: ' +
+          '<strong>' + pct(a.dd50, 1) + '</strong> · below a quarter: ' + pct(a.dd25, 1) + '. ' +
+          'This is a fixed barrier measured from the start — not the same thing as max drawdown ' +
+          'from a running peak, which keeps growing with the length of the run.'));
+      }
+
+      drawCurves(q, tModel, a.fullKellyFraction);
+    }
+
+    /* Growth vs. Kelly multiple, plus sensitivity to an overestimated edge. */
+    function drawCurves(q, tModel, fStar) {
+      var N = 121, xs = [], gs = [], gPos = [], gNeg = [];
+      for (var i = 0; i < N; i++) {
+        var m = (i / (N - 1)) * 2.5;
+        var f = K.clamp(fStar * m, 0, 0.999999);
+        var g = m === 0 ? 0 : K.growthRate(tModel, f);
+        if (!isFinite(g)) g = NaN;
+        xs.push(m); gs.push(g);
+        gPos.push(isFinite(g) ? Math.max(g, 0) : 0);
+        gNeg.push(isFinite(g) ? Math.min(g, 0) : 0);
+      }
+      var gMax = 0, gMin = 0;
+      gs.forEach(function (g) { if (isFinite(g)) { gMax = Math.max(gMax, g); gMin = Math.min(gMin, g); } });
+      var span = Math.max(gMax - gMin, 1e-9);
+      var k0 = K.zeroGrowthMultiple(tModel);
+
+      chCurve.setData({
+        x: xs, xMin: 0, xMax: 2.5,
+        yMin: gMin - span * 0.12, yMax: gMax + span * 0.18,
+        xLabel: 'multiple of full Kelly', yLabel: 'growth per ticket (bps)',
+        fmtX: function (v) { return v.toFixed(2) + '×'; }, fmtY: bpsAxis,
+        fmtTipX: function (v) { return v.toFixed(2) + '× Kelly'; },
+        bands: [
+          { lo: gs.map(function () { return 0; }), hi: gPos, color: C.css('--div-pos'), alpha: 0.16 },
+          { lo: gNeg, hi: gs.map(function () { return 0; }), color: C.css('--div-neg'), alpha: 0.16 }
+        ],
+        lines: [{ y: gs, color: C.css('--series-1'), width: 2, label: 'growth' }],
+        refLines: [
+          { y: 0, color: C.css('--axis') },
+          isFinite(k0) ? { x: k0, color: C.css('--critical'), label: 'zero growth ' + k0.toFixed(2) + '×' } : null
+        ].filter(Boolean),
+        markers: [{ x: 1, y: K.growthRate(tModel, fStar), color: C.css('--series-1') }],
+        tipRows: function (i) {
+          return [
+            { label: 'growth/ticket', value: bps(gs[i]), color: C.css('--series-1') },
+            { label: 'fraction at risk', value: pct(K.clamp(fStar * xs[i], 0, 1), 2) },
+            { label: 'over 100 tickets', value: isFinite(gs[i]) ? per100(gs[i]) : '—' }
+          ];
+        }
+      });
+
+      /* Sensitivity: sized from the model, reality moves. The dangerous
+       * direction differs by side, so the window leans that way. */
+      var sell = isSell();
+      var variants = [
+        { label: 'full Kelly', mult: 1, color: C.css('--series-1') },
+        { label: '½ Kelly', mult: 0.5, color: C.css('--series-2') },
+        { label: '¼ Kelly', mult: 0.25, color: C.css('--series-3') }
+      ];
+      var errLo = sell ? -0.06 : -0.08;
+      var errHi = sell ? 0.08 : 0.06;
+      var M = 101, errs = [], series = variants.map(function () { return []; });
+      for (var e = 0; e < M; e++) {
+        var rel = errLo + (e / (M - 1)) * (errHi - errLo);
+        errs.push(rel);
+        var pT = K.clamp(q.pAsk * (1 + rel), 1e-9, 1 - 1e-9);
+        var tT = K.ticketParams(pT, q.price, q.side);
+        variants.forEach(function (v, vi) {
+          var f = K.clamp(fStar * v.mult, 0, 0.999999);
+          series[vi].push(K.growthRate({ b: tModel.b, winProb: tT.winProb, lossProb: tT.lossProb }, f));
+        });
+      }
+      var sMin = Infinity, sMax = -Infinity;
+      series.forEach(function (arr) { arr.forEach(function (v) { if (isFinite(v)) { sMin = Math.min(sMin, v); sMax = Math.max(sMax, v); } }); });
+      var sSpan = Math.max(sMax - sMin, 1e-9);
+
+      chSens.setData({
+        x: errs, xMin: errs[0], xMax: errs[errs.length - 1],
+        yMin: sMin - sSpan * 0.1, yMax: sMax + sSpan * 0.1,
+        xLabel: 'how much more often the combo hits than modelled',
+        yLabel: 'growth per ticket (bps)',
+        fmtX: function (v) { return (v * 100).toFixed(0) + ' %'; }, fmtY: bpsAxis,
+        fmtTipX: function (v) { return (v * 100).toFixed(2) + ' % error'; },
+        lines: variants.map(function (v, vi) {
+          return { y: series[vi], color: v.color, width: 2, label: v.label };
+        }),
+        refLines: [{ y: 0, color: C.css('--axis'), label: 'zero growth' },
+          { x: 0, color: C.css('--text-muted'), label: 'model' }],
+        directLabels: true,
+        tipRows: function (i) {
+          return variants.map(function (v, vi) {
+            return { label: v.label, value: bps(series[vi][i]), color: v.color };
+          });
+        }
+      });
+      legend($('q_sensLegend'), variants.map(function (v) { return { color: v.color, label: v.label }; }));
+    }
+
+    runner('q', $('q_results'), function () {
+      var q = readQuote();
+      if (!isFinite(q.pAsk) || q.pAsk <= 0 || q.pAsk >= 1) throw new Error('invalid product of leg prices');
+      if (!isFinite(q.price) || q.price <= 0 || q.price >= 1) throw new Error('invalid ticket price');
+      var B0 = q.bankroll;
+      var cfg = {
+        mode: 'single', p: q.pAsk, price: q.price, side: q.side,
+        probHaircut: num($('q_haircut')) / 100,
+        bankroll: B0,
+        tickets: Math.round(num($('q_tickets'))),
+        sims: Math.round(num($('q_sims'))),
+        seed: Math.round(num($('q_seed'))),
+        sizing: readSizing('q', getSizing()),
+        capFraction: num($('q_cap')) / 100,
+        roundContracts: $('q_round').checked,
+        ruinFraction: num($('q_ruin')) / 100,
+        onDone: function (res) {
+          lastRes = res;
+          var tModel = K.ticketParams(q.pAsk, q.price, q.side);
+          var tTrue = K.ticketParams(q.pTrue, q.price, q.side);
+          var sizingVal = getSizing();
+          var f = sizingVal === 'kelly'
+            ? K.clamp(K.fullKelly(tModel) * num($('q_mult')), 0, 1)
+            : sizingVal === 'flatPct' ? num($('q_flatPct')) / 100 : num($('q_flatAbs')) / B0;
+          var gA = K.growthRate({ b: tModel.b, winProb: tTrue.winProb, lossProb: tTrue.lossProb }, f);
+
+          statKpis($('q_kpis'), res, B0, gA);
+          chFan.setData(fanData(res, $('q_log').checked, B0));
+          fanLegend($('q_fanLegend'));
+          chHist.setData(histData(res, B0));
+          legend($('q_histLegend'), [
+            { color: C.css('--div-neg'), label: 'ended below start', box: true },
+            { color: C.css('--div-pos'), label: 'ended above start', box: true }
+          ]);
+          chDD.setData(ddData(res));
+          chDec.setData(decileData(res, B0));
+          chQuant.setData(quantData(res, B0));
+          statTable($('q_table'), res, B0);
+
+          lastCfg = cfg;
+          showLog();
+        }
+      };
+      return cfg;
+    });
+
+    /* --- trade log --- */
+    var getLogPct = segment($('q_logPick'), function () { showLog(); });
+
+    function showLog() {
+      if (!lastRes || !lastCfg) return;
+      lastLog = renderLog($('q_tradeLog'), $('q_logInfo'), lastCfg, lastRes,
+        parseFloat(getLogPct()), num($('q_bankroll')));
+    }
+
+    $('q_logCsv').addEventListener('click', function () {
+      if (!lastLog) return;
+      downloadCsv('parlay-kelly-trade-log.csv',
+        ['ticket', 'p_combo', 'price', 'contracts', 'at_risk', 'max_win', 'won', 'pnl', 'bankroll'],
+        lastLog.log.map(function (r) {
+          return [r.ticket, r.pModel.toFixed(6), r.price.toFixed(6), r.contracts.toFixed(3),
+            r.liability.toFixed(2), r.premium.toFixed(2), r.win ? 1 : 0,
+            r.pnl.toFixed(2), r.bankroll.toFixed(2)];
+        }));
+    });
+
+    /* --- sizing comparison --- */
+    $('q_cmpRun').addEventListener('click', function () {
+      var btn = $('q_cmpRun');
+      if (btn.disabled) return;
+      var q = readQuote();
+      if (!isFinite(q.pAsk) || !isFinite(q.price)) return;
+      btn.disabled = true;
+      btn.textContent = 'running…';
+      var tModel = K.ticketParams(q.pAsk, q.price, q.side);
+      runComparison({
+        mode: 'single', p: q.pAsk, price: q.price, side: q.side,
+        probHaircut: num($('q_haircut')) / 100, bankroll: q.bankroll,
+        tickets: Math.round(num($('q_tickets'))),
+        sims: Math.min(Math.round(num($('q_sims'))), 20000),
+        seed: Math.round(num($('q_seed'))),
+        capFraction: num($('q_cap')) / 100,
+        roundContracts: $('q_round').checked,
+        ruinFraction: num($('q_ruin')) / 100,
+        _fStar: K.fullKelly(tModel)
+      }, chCmp, $('q_cmpLegend'), $('q_cmpTable'), function (p) {
+        btn.textContent = 'running ' + Math.round(p * 100) + ' %';
+      }).then(function () {
+        btn.disabled = false; btn.textContent = 'Run comparison';
+      }).catch(function () {
+        btn.disabled = false; btn.textContent = 'Run comparison';
+      });
+    });
+
+    $('q_csv').addEventListener('click', function () {
+      if (!lastRes) return;
+      downloadCsv('parlay-kelly-single.csv', ['ticket', 'p5', 'p25', 'median', 'p75', 'p95', 'mean'],
+        csvRows(lastRes));
+    });
+
+    wireSeed('q');
+    renderLegs();
+    update();
+  })();
+
+  /* ══════════════════ SECTION 2 — a band of tickets ══════════════════ */
+
+  (function rangeView() {
+    var lastRes = null, lastCfg = null, lastLog = null;
+    var chFan = mount('r_fan'), chG = mount('r_gcurve'), chM = mount('r_mcurve');
+    var chHist = mount('r_hist'), chDD = mount('r_dd');
+    var chDec = mount('r_deciles'), chQuant = mount('r_quant'), chCmp = mount('r_cmp');
+
+    var getDist = segment($('r_dist'), function (v) {
+      show($('r_modeField'), v === 'triangular');
+      update();
+    });
+    var getSizing = wireSizing('r');
+
+    onPerspective(function () { update(); markStale('r', $('r_results')); });
+
+    ['r_bankroll', 'r_markup', 'r_qLo', 'r_qHi', 'r_distMode', 'r_haircut',
+      'r_mult', 'r_flatPct', 'r_flatAbs', 'r_cap', 'r_concurrent'].forEach(function (id) {
+      $(id).addEventListener('input', update);
+    });
+    $('r_split').addEventListener('change', update);
+    $('r_log').addEventListener('change', function () {
+      if (lastRes) chFan.setData(fanData(lastRes, $('r_log').checked, num($('r_bankroll'))));
+    });
+
+    function read() {
+      var lo = num($('r_qLo')), hi = num($('r_qHi'));
+      if (lo > hi) { var t = lo; lo = hi; hi = t; }
+      return {
+        qLo: lo, qHi: hi,
+        markup: num($('r_markup')) / 100,
+        dist: getDist(),
+        distMode: num($('r_distMode')),
+        haircut: num($('r_haircut')) / 100,
+        bankroll: num($('r_bankroll')),
+        concurrent: Math.max(1, Math.round(num($('r_concurrent'))))
+      };
+    }
+
+    /* The band is defined over YOUR win probability. Which combo probability
+     * and price that implies depends on which side you are on. */
+    function ticketAt(q, r) {
+      var p = isSell() ? 1 - q : q;
+      var c = K.clamp(K.priceFromEdge(p, r.markup, side), 1e-6, 1 - 1e-6);
+      return K.ticketParams(p, c, side);
+    }
+
+    function update() {
+      var r = read();
+      var sell = isSell();
+      $('r_qLoOut').textContent = r.qLo.toFixed(2);
+      $('r_qHiOut').textContent = r.qHi.toFixed(2);
+      $('r_distModeOut').textContent = r.distMode.toFixed(2);
+      $('r_haircutOut').textContent = (num($('r_haircut'))).toFixed(1) + ' %';
+
+      // mirror the band into prices
+      var tLo = ticketAt(r.qLo, r), tHi = ticketAt(r.qHi, r);
+      var pA = Math.min(tLo.p, tHi.p), pB = Math.max(tLo.p, tHi.p);
+      var cA = Math.min(tLo.price, tHi.price), cB = Math.max(tLo.price, tHi.price);
+      $('r_mirrorQ').textContent = (r.qLo * 100).toFixed(0) + '–' + (r.qHi * 100).toFixed(0) + ' %';
+      $('r_mirrorP').textContent = pA.toFixed(3) + '–' + pB.toFixed(3);
+      $('r_mirrorC').textContent = cA.toFixed(3) + '–' + cB.toFixed(3);
+
+      var sizingVal = getSizing();
+      var mult = sizingVal === 'kelly' ? num($('r_mult')) : 1;
+      // For a seller full Kelly is m/(1+m) everywhere in the band. For a buyer
+      // it is not — f* = p·d/(1 - p(1-d)) moves with p — so the balanced end
+      // is used as the reference and the spread is reported in the note.
+      var fLo = K.fullKelly(tLo), fHi = K.fullKelly(tHi);
+      var fStar = fLo;
+      var applied = K.clamp(fStar * mult, 0, 1);
+      if (sizingVal === 'flatPct') applied = num($('r_flatPct')) / 100;
+      if (sizingVal === 'flatAbs') applied = num($('r_flatAbs')) / r.bankroll;
+      applied = Math.min(applied, num($('r_cap')) / 100);
+
+      $('r_heroF').textContent = pct(applied, 2);
+      var kellyDesc = sell
+        ? 'full Kelly = m/(1+m) = ' + pct(fStar, 2)
+        : 'full Kelly ' + pct(Math.min(fLo, fHi), 2) + '–' + pct(Math.max(fLo, fHi), 2) + ' across the band';
+      $('r_heroNote').textContent = kellyDesc +
+        (r.concurrent > 1
+          ? ($('r_split').checked
+            ? ' · split across ' + r.concurrent + ' concurrent → ' + pct(applied / r.concurrent, 2) + ' per ticket'
+            : ' · ' + r.concurrent + ' concurrent at ' + pct(applied, 2) + ' each, ' +
+              pct(applied * r.concurrent, 2) + ' of bankroll in total')
+          : '');
+
+      /* --- curves across the band --- */
+      var N = 121, qs = [], gs = [], ms = [];
+      for (var i = 0; i < N; i++) {
+        var q = r.qLo + (i / (N - 1)) * (r.qHi - r.qLo);
+        var t = ticketAt(q, r);
+        qs.push(q);
+        gs.push(K.growthRate(t, K.clamp(K.fullKelly(t) * mult, 0, 0.999999)));
+        ms.push(NaN);
+      }
+      // reference growth = the most balanced ticket in the band (lowest q)
+      var gRef = K.growthRate(tLo, K.fullKelly(tLo));
+      for (var j = 0; j < N; j++) {
+        var pj = sell ? 1 - qs[j] : qs[j];
+        var mm = K.edgeForGrowth(pj, gRef, side);
+        ms[j] = isFinite(mm) ? mm * 100 : NaN;
+      }
+
+      var gMin = Infinity, gMax = -Infinity;
+      gs.forEach(function (v) { if (isFinite(v)) { gMin = Math.min(gMin, v); gMax = Math.max(gMax, v); } });
+      var gSpan = Math.max(gMax - gMin, 1e-9);
+
+      $('r_gBal').textContent = bps(gs[0]);
+      $('r_gFav').textContent = bps(gs[N - 1]);
+      $('r_gRatio').textContent = isFinite(gs[N - 1]) && gs[N - 1] !== 0
+        ? (gs[0] / gs[N - 1]).toFixed(1) + '×' : '—';
+      var avg = 0, cnt = 0;
+      gs.forEach(function (v) { if (isFinite(v)) { avg += v; cnt++; } });
+      $('r_gAvg').textContent = cnt ? bps(avg / cnt) : '—';
+
+      chG.setData({
+        x: qs, xMin: r.qLo, xMax: r.qHi,
+        yMin: Math.min(0, gMin - gSpan * 0.1), yMax: gMax + gSpan * 0.12,
+        xLabel: 'your win probability', yLabel: 'growth per ticket (bps)',
+        fmtX: function (v) { return v.toFixed(2); }, fmtY: bpsAxis,
+        fmtTipX: function (v) {
+          return 'win prob ' + v.toFixed(3) + ' · price ' + ticketAt(v, r).price.toFixed(4);
+        },
+        bands: [{ lo: gs.map(function () { return 0; }), hi: gs.map(function (v) { return isFinite(v) ? Math.max(v, 0) : 0; }), color: C.css('--series-1'), alpha: 0.13 }],
+        lines: [{ y: gs, color: C.css('--series-1'), width: 2, label: 'growth' }],
+        refLines: [{ y: 0, color: C.css('--axis') }],
+        tipRows: function (i) {
+          return [
+            { label: 'growth/ticket', value: bps(gs[i]), color: C.css('--series-1') },
+            { label: 'over 100 tickets', value: isFinite(gs[i]) ? per100(gs[i]) : '—' },
+            { label: 'product of legs', value: (sell ? 1 - qs[i] : qs[i]).toFixed(4) }
+          ];
+        }
+      });
+
+      var mMin = Infinity, mMax = -Infinity;
+      ms.forEach(function (v) { if (isFinite(v)) { mMin = Math.min(mMin, v); mMax = Math.max(mMax, v); } });
+      chM.setData({
+        x: qs, xMin: r.qLo, xMax: r.qHi,
+        yMin: Math.max(0, mMin - (mMax - mMin) * 0.12), yMax: mMax + (mMax - mMin) * 0.12 + 0.1,
+        xLabel: 'your win probability', yLabel: 'edge required',
+        fmtX: function (v) { return v.toFixed(2); },
+        fmtY: function (v) { return v.toFixed(1) + ' %'; },
+        fmtTipX: function (v) { return 'win prob ' + v.toFixed(3); },
+        lines: [{ y: ms, color: C.css('--series-4'), width: 2, label: 'edge required' }],
+        refLines: [{ y: r.markup * 100, color: C.css('--text-muted'), label: 'you take ' + (r.markup * 100).toFixed(1) + ' %' }],
+        tipRows: function (i) {
+          return [
+            { label: 'for equal growth', value: isFinite(ms[i]) ? ms[i].toFixed(2) + ' %' : '—', color: C.css('--series-4') },
+            { label: 'you take', value: (r.markup * 100).toFixed(2) + ' %' }
+          ];
+        }
+      });
+
+      /* --- insight --- */
+      var box = $('r_callouts');
+      while (box.firstChild) box.removeChild(box.firstChild);
+      // Which end of the band earns more is NOT fixed: selling favours the
+      // balanced end, buying at a fixed discount favours the long shots,
+      // because there f* climbs with p instead of staying put.
+      var rawRatio = isFinite(gs[0]) && isFinite(gs[N - 1]) && gs[N - 1] !== 0
+        ? gs[0] / gs[N - 1] : NaN;
+      var richer, poorer, times;
+      if (isFinite(rawRatio) && rawRatio >= 1) {
+        richer = 'A balanced ticket (win prob ' + r.qLo.toFixed(2) + ')';
+        poorer = 'a long shot (' + r.qHi.toFixed(2) + ')';
+        times = rawRatio.toFixed(1);
+      } else if (isFinite(rawRatio) && rawRatio > 0) {
+        richer = 'A long shot (win prob ' + r.qHi.toFixed(2) + ')';
+        poorer = 'a balanced ticket (' + r.qLo.toFixed(2) + ')';
+        times = (1 / rawRatio).toFixed(1);
+      }
+      var comparison = richer
+        ? ' ' + richer + ' earns <strong>' + times + '×</strong> more log growth than ' + poorer + '.'
+        : '';
+      box.appendChild(callout('', sell
+        ? 'At a fixed markup, Kelly is <strong>constant</strong> (' + pct(fStar, 2) +
+          ') across the whole band — but growth per ticket is not.' + comparison +
+          ' Both tie up exactly the same capital.'
+        : 'At a fixed discount, Kelly <strong>moves</strong> across the band (' +
+          pct(Math.min(fLo, fHi), 2) + '–' + pct(Math.max(fLo, fHi), 2) +
+          ') — buying is not the mirror image of selling in this respect, because f* climbs ' +
+          'with the probability instead of staying put.' + comparison));
+      if (isFinite(ms[N - 1])) {
+        box.appendChild(callout('',
+          'For the lopsided end to earn what the balanced end does, you would need <strong>' +
+          ms[N - 1].toFixed(1) + ' %</strong> there instead of ' + (r.markup * 100).toFixed(1) + ' %.'));
+      }
+      if (r.concurrent > 1) {
+        var k = r.concurrent;
+        // The share of growth left after splitting Kelly k ways (quadratic
+        // approximation of g(f) = fμ - ½f²σ²; within 0.1 % of the exact value).
+        var keep = 2 / k - 1 / (k * k);
+        if ($('r_split').checked) {
+          box.appendChild(callout('warn',
+            'You are splitting Kelly across ' + k + ' concurrent tickets. That is only right when they ' +
+            'are <strong>perfectly correlated</strong> — when they hang on the same legs. If they are ' +
+            'independent, you are underbetting and giving up roughly <strong>' + ((1 - keep) * 100).toFixed(0) +
+            ' %</strong> of the growth per ticket.'));
+        } else {
+          box.appendChild(callout('',
+            'Each of the ' + k + ' concurrent tickets is sized at full Kelly. For <strong>independent</strong> ' +
+            'events that is correct, and concurrency changes nothing — growth and drawdown come out the same ' +
+            'as running them one after another. Once they start sharing legs, exposure adds up and just two ' +
+            'perfectly correlated tickets drive growth to zero.'));
+        }
+      }
+    }
+
+    runner('r', $('r_results'), function () {
+      var r = read();
+      if (r.qHi <= r.qLo) throw new Error('the upper edge of the band must sit above the lower');
+      var B0 = r.bankroll;
+      var cfg = {
+        mode: 'range', markup: r.markup, qLo: r.qLo, qHi: r.qHi,
+        dist: r.dist, distMode: r.distMode, side: side,
+        probHaircut: r.haircut,
+        bankroll: B0,
+        tickets: Math.round(num($('r_tickets'))),
+        sims: Math.round(num($('r_sims'))),
+        seed: Math.round(num($('r_seed'))),
+        sizing: readSizing('r', getSizing()),
+        capFraction: num($('r_cap')) / 100,
+        ruinFraction: num($('r_ruin')) / 100,
+        concurrent: r.concurrent,
+        concurrentSplit: $('r_split').checked,
+        onDone: function (res) {
+          lastRes = res;
+          statKpis($('r_kpis'), res, B0, null);
+          chFan.setData(fanData(res, $('r_log').checked, B0));
+          fanLegend($('r_fanLegend'));
+          chHist.setData(histData(res, B0));
+          legend($('r_histLegend'), [
+            { color: C.css('--div-neg'), label: 'ended below start', box: true },
+            { color: C.css('--div-pos'), label: 'ended above start', box: true }
+          ]);
+          chDD.setData(ddData(res));
+          chDec.setData(decileData(res, B0));
+          chQuant.setData(quantData(res, B0));
+          statTable($('r_table'), res, B0);
+
+          lastCfg = cfg;
+          showLog();
+        }
+      };
+      return cfg;
+    });
+
+    /* --- trade log --- */
+    var getLogPct = segment($('r_logPick'), function () { showLog(); });
+
+    function showLog() {
+      if (!lastRes || !lastCfg) return;
+      lastLog = renderLog($('r_tradeLog'), $('r_logInfo'), lastCfg, lastRes,
+        parseFloat(getLogPct()), num($('r_bankroll')));
+    }
+
+    $('r_logCsv').addEventListener('click', function () {
+      if (!lastLog) return;
+      downloadCsv('parlay-kelly-band-log.csv',
+        ['ticket', 'p_combo', 'price', 'contracts', 'at_risk', 'max_win', 'won', 'pnl', 'bankroll'],
+        lastLog.log.map(function (t) {
+          return [t.ticket, t.pModel.toFixed(6), t.price.toFixed(6), t.contracts.toFixed(3),
+            t.liability.toFixed(2), t.premium.toFixed(2), t.win ? 1 : 0,
+            t.pnl.toFixed(2), t.bankroll.toFixed(2)];
+        }));
+    });
+
+    /* --- sizing comparison --- */
+    $('r_cmpRun').addEventListener('click', function () {
+      var btn = $('r_cmpRun');
+      if (btn.disabled) return;
+      var r = read();
+      if (r.qHi <= r.qLo) return;
+      btn.disabled = true; btn.textContent = 'running…';
+      runComparison({
+        mode: 'range', markup: r.markup, qLo: r.qLo, qHi: r.qHi,
+        dist: r.dist, distMode: r.distMode, side: side,
+        probHaircut: r.haircut, bankroll: r.bankroll,
+        tickets: Math.round(num($('r_tickets'))),
+        sims: Math.min(Math.round(num($('r_sims'))), 20000),
+        seed: Math.round(num($('r_seed'))),
+        capFraction: num($('r_cap')) / 100,
+        ruinFraction: num($('r_ruin')) / 100,
+        concurrent: r.concurrent,
+        concurrentSplit: $('r_split').checked,
+        _fStar: K.fullKelly(ticketAt(r.qLo, r))
+      }, chCmp, $('r_cmpLegend'), $('r_cmpTable'), function (p) {
+        btn.textContent = 'running ' + Math.round(p * 100) + ' %';
+      }).then(function () {
+        btn.disabled = false; btn.textContent = 'Run comparison';
+      }).catch(function () {
+        btn.disabled = false; btn.textContent = 'Run comparison';
+      });
+    });
+
+    $('r_csv').addEventListener('click', function () {
+      if (!lastRes) return;
+      downloadCsv('parlay-kelly-band.csv', ['ticket', 'p5', 'p25', 'median', 'p75', 'p95', 'mean'],
+        csvRows(lastRes));
+    });
+
+    wireSeed('r');
+    update();
+  })();
+
+  applyPerspectiveLabels();
+})();
+
+</script>
+</body>
+</html>

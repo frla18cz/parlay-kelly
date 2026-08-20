@@ -1,0 +1,453 @@
+/* styles.css — the design system.
+ *
+ * The chart colours are a validated reference palette and must NOT be
+ * changed: --surface-1 is the plotting surface the contrasts were verified
+ * against. Depth comes from layout and motion, never from off-palette hues.
+ */
+
+/* ---- tokens: dark (the base) ----------------------------------------- */
+:root {
+  color-scheme: dark;
+
+  --plane: #0d0d0d;
+  --surface-1: #1a1a19;
+  --surface-2: #222220;
+  --surface-3: #2a2a27;
+
+  --text-primary: #ffffff;
+  --text-secondary: #c3c2b7;
+  --text-muted: #898781;
+
+  --gridline: #2c2c2a;
+  --axis: #383835;
+  --border: rgba(255, 255, 255, 0.10);
+  --border-strong: rgba(255, 255, 255, 0.16);
+  --crosshair: #898781;
+  --spaghetti: #898781;
+
+  /* categorical slots — dark steps, checked by the palette validator */
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+  --series-5: #d55181;
+  --series-7: #9085e9;
+  --series-8: #e66767;
+
+  /* diverging pair plus a neutral midpoint */
+  --div-pos: #3987e5;
+  --div-neg: #e66767;
+  --div-mid: #383835;
+
+  /* state colours — never used as a data series */
+  --good: #0ca30c;
+  --warning: #fab219;
+  --serious: #ec835a;
+  --critical: #d03b3b;
+
+  --accent-glow: rgba(57, 135, 229, 0.20);
+  --radius: 14px;
+  --radius-sm: 9px;
+  --font: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+/* ---- tokens: light --------------------------------------------------- */
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --plane: #f9f9f7;
+  --surface-1: #fcfcfb;
+  --surface-2: #f3f2ef;
+  --surface-3: #eae9e4;
+
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #898781;
+
+  --gridline: #e1e0d9;
+  --axis: #c3c2b7;
+  --border: rgba(11, 11, 11, 0.10);
+  --border-strong: rgba(11, 11, 11, 0.16);
+
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+  --series-5: #e87ba4;
+  --series-7: #4a3aa7;
+  --series-8: #e34948;
+
+  --div-pos: #2a78d6;
+  --div-neg: #e34948;
+  --div-mid: #f0efec;
+
+  --good: #006300;
+  --accent-glow: rgba(42, 120, 214, 0.14);
+}
+
+/* ---- base ------------------------------------------------------------ */
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--plane);
+  color: var(--text-primary);
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+body::before {
+  /* a slight warming of the background — depth without extra hues */
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(1100px 600px at 12% -10%, var(--accent-glow), transparent 65%),
+    radial-gradient(900px 500px at 100% 0%, rgba(217, 89, 38, 0.07), transparent 60%);
+  z-index: 0;
+}
+
+.app { position: relative; z-index: 1; }
+
+h1, h2, h3 { margin: 0; font-weight: 600; letter-spacing: -0.01em; }
+a { color: var(--series-1); }
+
+/* ---- top bar --------------------------------------------------------- */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 12px 22px;
+  background: color-mix(in srgb, var(--plane) 82%, transparent);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--border);
+}
+
+.brand { display: flex; align-items: baseline; gap: 10px; margin-right: auto; }
+.brand h1 { font-size: 15px; }
+.brand .sub { font-size: 12px; color: var(--text-muted); }
+
+.tabs { display: flex; gap: 3px; padding: 3px; background: var(--surface-2); border-radius: 10px; }
+.tab {
+  appearance: none; border: 0; cursor: pointer;
+  padding: 7px 15px; border-radius: 8px;
+  background: transparent; color: var(--text-secondary);
+  font: inherit; font-size: 13px; font-weight: 500;
+  transition: background .15s, color .15s;
+}
+.tab:hover { color: var(--text-primary); }
+.tab[aria-selected="true"] { background: var(--surface-1); color: var(--text-primary); box-shadow: 0 1px 3px rgba(0,0,0,.28); }
+
+.icon-btn {
+  appearance: none; cursor: pointer;
+  width: 34px; height: 34px; border-radius: 9px;
+  border: 1px solid var(--border);
+  background: var(--surface-1); color: var(--text-secondary);
+  font-size: 15px; line-height: 1;
+  display: grid; place-items: center;
+}
+.icon-btn:hover { color: var(--text-primary); border-color: var(--border-strong); }
+/* the same chip, but it is a link, so it must not inherit the anchor colour */
+.repo-link { text-decoration: none; color: var(--text-secondary); }
+.repo-link:hover { color: var(--text-primary); }
+
+/* ---- perspective bar --------------------------------------------------
+ *
+ * The single most important control on the page: it decides whether every
+ * number below is computed from the seller's seat or the buyer's. It gets a
+ * full-width row of its own precisely so nobody can miss which side is live.
+ */
+.perspbar {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+  padding: 13px 22px;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+}
+.perspbar-lead { display: flex; flex-direction: column; gap: 3px; margin-right: auto; }
+.perspbar-q { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.perspbar-note { font-size: 12px; color: var(--text-secondary); }
+.perspbar-note strong { color: var(--text-primary); }
+
+.seg.persp { padding: 4px; background: var(--surface-1); }
+.seg.persp button {
+  display: flex; flex-direction: column; gap: 2px;
+  align-items: flex-start; text-align: left;
+  padding: 8px 15px; min-width: 178px;
+  white-space: normal; overflow: visible;
+}
+.seg.persp button[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--series-1) 16%, var(--surface-1));
+  box-shadow: inset 0 0 0 1px var(--series-1);
+}
+.seg.persp .pt { font-size: 13px; font-weight: 600; }
+.seg.persp button[aria-pressed="true"] .pt { color: var(--series-1); }
+.seg.persp .ps { font-size: 11px; color: var(--text-muted); font-weight: 400; }
+
+/* ---- layout ---------------------------------------------------------- */
+.view { display: none; }
+.view.active { display: block; }
+
+.layout {
+  display: grid;
+  grid-template-columns: 340px minmax(0, 1fr);
+  gap: 20px;
+  padding: 20px 22px 60px;
+  max-width: 1760px;
+  margin: 0 auto;
+  align-items: start;
+}
+@media (max-width: 1080px) { .layout { grid-template-columns: 1fr; } }
+
+.panel {
+  position: sticky;
+  top: 70px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-height: calc(100vh - 92px);
+  overflow-y: auto;
+  padding-right: 4px;
+}
+@media (max-width: 1080px) { .panel { position: static; max-height: none; } }
+
+.results { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+
+/* ---- cards ----------------------------------------------------------- */
+.card {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+.card > header {
+  display: flex; align-items: center; gap: 10px;
+  margin: -2px 0 12px;
+}
+.card > header h3 { font-size: 13px; letter-spacing: .01em; }
+.card > header .hint { font-size: 11.5px; color: var(--text-muted); font-weight: 400; }
+.card > header .spacer { margin-left: auto; }
+
+.card-sub { font-size: 11.5px; color: var(--text-muted); margin: -6px 0 12px; }
+
+/* ---- forms ----------------------------------------------------------- */
+.field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 11px; }
+.field:last-child { margin-bottom: 0; }
+.field > label { font-size: 11.5px; color: var(--text-secondary); font-weight: 500; }
+.field .note { font-size: 10.5px; color: var(--text-muted); }
+
+.row { display: flex; gap: 9px; }
+.row > * { flex: 1; min-width: 0; }
+
+input[type="number"], input[type="text"], select {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-primary);
+  font: inherit; font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+input:focus, select:focus {
+  outline: none;
+  border-color: var(--series-1);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+input[type="range"] { width: 100%; accent-color: var(--series-1); }
+
+.seg { display: flex; gap: 3px; padding: 3px; background: var(--surface-2); border-radius: 10px; }
+.seg button {
+  flex: 1; appearance: none; border: 0; cursor: pointer;
+  padding: 7px 8px; border-radius: 7px;
+  background: transparent; color: var(--text-secondary);
+  font: inherit; font-size: 12px; font-weight: 500;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.seg button[aria-pressed="true"] { background: var(--surface-1); color: var(--text-primary); box-shadow: 0 1px 3px rgba(0,0,0,.3); }
+.seg.vertical { flex-direction: column; }
+.seg.vertical button { text-align: left; }
+
+.check { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-secondary); cursor: pointer; }
+.check input { accent-color: var(--series-1); width: 15px; height: 15px; }
+
+.btn {
+  appearance: none; cursor: pointer;
+  padding: 10px 16px; border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  background: var(--series-1); color: #fff;
+  font: inherit; font-size: 13px; font-weight: 600;
+  transition: filter .15s;
+}
+.btn:hover { filter: brightness(1.08); }
+.btn:disabled { opacity: .5; cursor: default; filter: none; }
+.btn.secondary { background: var(--surface-2); color: var(--text-primary); border-color: var(--border); }
+
+/* ---- legs ------------------------------------------------------------ */
+.legs { display: flex; flex-direction: column; gap: 6px; }
+.leg { display: flex; align-items: center; gap: 8px; }
+.leg .idx { font-size: 11px; color: var(--text-muted); width: 34px; font-variant-numeric: tabular-nums; }
+.leg input { flex: 1; }
+.leg button {
+  appearance: none; cursor: pointer; width: 28px; height: 32px;
+  border-radius: 7px; border: 1px solid var(--border);
+  background: var(--surface-2); color: var(--text-muted); font-size: 15px; line-height: 1;
+}
+.leg button:hover { color: var(--critical); border-color: var(--border-strong); }
+
+/* ---- quote / hero ---------------------------------------------------- */
+.quote {
+  background: linear-gradient(180deg, var(--surface-2), var(--surface-1));
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  padding: 18px;
+}
+.hero-label { font-size: 11.5px; color: var(--text-secondary); text-transform: none; }
+.hero {
+  font-size: 52px; font-weight: 650; line-height: 1.02;
+  letter-spacing: -0.03em; margin: 2px 0 2px;
+  /* proportional figures — tabular reads too loose at this size */
+}
+.hero-note { font-size: 12px; color: var(--text-muted); }
+
+.quote-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px 14px;
+  margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border);
+}
+.qi .k { font-size: 10.5px; color: var(--text-muted); }
+.qi .v { font-size: 16px; font-weight: 600; letter-spacing: -0.01em; }
+.qi .v small { font-size: 11px; font-weight: 500; color: var(--text-muted); }
+
+/* ---- KPI tiles ------------------------------------------------------- */
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(148px, 1fr)); gap: 10px; }
+.kpi {
+  background: var(--surface-1); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 12px 13px;
+}
+.kpi .k { font-size: 10.5px; color: var(--text-muted); margin-bottom: 3px; }
+.kpi .v { font-size: 21px; font-weight: 620; letter-spacing: -0.02em; }
+.kpi .d { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+.kpi .v.pos { color: var(--good); }
+.kpi .v.neg { color: var(--critical); }
+
+/* ---- charts ---------------------------------------------------------- */
+.chart-card { background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
+.chart-card > header { display: flex; align-items: baseline; gap: 10px; margin-bottom: 4px; }
+.chart-card > header h3 { font-size: 13px; }
+.chart-card > header .hint { font-size: 11.5px; color: var(--text-muted); }
+.chart-card > header .spacer { margin-left: auto; }
+
+.chart { position: relative; width: 100%; height: 300px; }
+.chart.tall { height: 380px; }
+.chart.short { height: 230px; }
+.chart-canvas { display: block; width: 100%; height: 100%; }
+
+.chart-tip {
+  position: absolute; pointer-events: none; z-index: 5;
+  background: var(--surface-3);
+  border: 1px solid var(--border-strong);
+  border-radius: 9px; padding: 8px 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .4);
+  min-width: 132px;
+}
+.tip-head { font-size: 10.5px; color: var(--text-muted); margin-bottom: 5px; }
+.tip-row { display: flex; align-items: center; gap: 7px; line-height: 1.6; }
+.tip-key { width: 11px; height: 2px; border-radius: 2px; flex: none; }
+.tip-val { font-size: 12.5px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.tip-lab { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+
+.legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 10px; }
+.legend-item { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--text-secondary); }
+.legend-key { width: 13px; height: 2px; border-radius: 2px; }
+.legend-key.box { height: 10px; border-radius: 3px; }
+
+/* min() matters here — without it a 400px footprint would not shrink on a
+   narrow phone and the whole page would scroll sideways */
+.grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(400px, 100%), 1fr)); gap: 16px; }
+
+/* ---- callout ---------------------------------------------------------- */
+.callout {
+  display: flex; gap: 11px;
+  border: 1px solid var(--border);
+  border-left: 2px solid var(--series-1);
+  background: var(--surface-1);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+}
+.callout .ico { font-size: 14px; line-height: 1.4; }
+.callout .body { font-size: 12.5px; color: var(--text-secondary); }
+.callout .body strong { color: var(--text-primary); font-weight: 600; }
+.callout.warn { border-left-color: var(--warning); }
+.callout.bad { border-left-color: var(--critical); }
+
+/* ---- tables ---------------------------------------------------------- */
+.tablewrap { overflow-x: auto; margin-top: 10px; }
+/* the log can run to hundreds of rows — do not let it stretch the page */
+.logwrap { max-height: 460px; overflow-y: auto; }
+.logwrap thead th { position: sticky; top: 0; background: var(--surface-1); z-index: 1; }
+tbody tr.win td:first-child { box-shadow: inset 2px 0 0 var(--good); }
+tbody tr.loss td:first-child { box-shadow: inset 2px 0 0 var(--critical); }
+td.pos { color: var(--good); }
+td.neg { color: var(--critical); }
+table { border-collapse: collapse; width: 100%; font-size: 12px; }
+th, td { padding: 6px 10px; text-align: right; white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+thead th { color: var(--text-muted); font-weight: 500; font-size: 10.5px; border-bottom: 1px solid var(--border); }
+tbody td { font-variant-numeric: tabular-nums; border-bottom: 1px solid var(--gridline); }
+tbody tr:last-child td { border-bottom: 0; }
+
+/* ---- progress --------------------------------------------------------- */
+.runbar { display: flex; align-items: center; gap: 12px; }
+.progress { flex: 1; height: 4px; border-radius: 3px; background: var(--surface-3); overflow: hidden; }
+.progress > i { display: block; height: 100%; width: 0; background: var(--series-1); transition: width .1s linear; }
+.runstate { font-size: 11px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+
+/* Results that belong to the other side of the trade: dimmed and desaturated
+   until re-run, so stale numbers are never mistaken for current ones. */
+.results.stale { opacity: .38; filter: saturate(.4); transition: opacity .2s, filter .2s; }
+
+/* while recomputing, dim the previous drawing — no skeleton, no jump */
+.results.busy .chart-card, .results.busy .kpis { opacity: .55; transition: opacity .12s; }
+
+/* ---- mobile ---------------------------------------------------------- */
+/* Without this the header breaks into four lines on a phone and the buttons
+   in card headers overflow off the page. */
+@media (max-width: 720px) {
+  .topbar { padding: 9px 13px; gap: 10px; }
+  .brand { gap: 0; }
+  .brand h1 { font-size: 14px; white-space: nowrap; }
+  .brand .sub { display: none; }
+  .tab { padding: 7px 11px; font-size: 12.5px; }
+  .icon-btn { width: 32px; height: 32px; }
+
+  .layout { padding: 14px 13px 48px; gap: 14px; }
+  .card, .chart-card, .quote { padding: 13px; }
+
+  /* the card header wraps, controls move to a second line */
+  .card > header, .chart-card > header { flex-wrap: wrap; row-gap: 9px; }
+  .card > header .spacer, .chart-card > header .spacer { flex-basis: 100%; margin-left: 0; }
+
+  .chart { height: 250px; }
+  .chart.tall { height: 300px; }
+  .chart.short { height: 200px; }
+
+  .hero { font-size: 38px; }
+  .quote-grid { grid-template-columns: 1fr; gap: 10px; }
+  .kpis { grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); gap: 8px; }
+  .logwrap { max-height: 340px; }
+}
+
+.tab { white-space: nowrap; }
+
+.muted { color: var(--text-muted); }
+.mono { font-variant-numeric: tabular-nums; }
+.hidden { display: none !important; }

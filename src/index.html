@@ -1,0 +1,537 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Parlay Kelly — bet sizing for combo tickets, either side of the trade</title>
+<meta name="theme-color" content="#0d0d0d">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<script>
+/* The theme is driven by an attribute that is always present, never a bare
+ * :root — a host page can rewrite <html> and leave the document unstamped.
+ * Dark is the deliberate default; the toggle in the bar flips it. */
+(function () {
+  var r = document.documentElement;
+  if (!r.dataset.theme) r.dataset.theme = 'dark';
+})();
+</script>
+<div class="app">
+
+  <div class="topbar">
+    <div class="brand">
+      <h1>Parlay Kelly</h1>
+      <span class="sub">combo tickets · how much to risk</span>
+    </div>
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" id="tab-quote" aria-selected="true" data-view="quote">Single ticket</button>
+      <button class="tab" role="tab" id="tab-range" aria-selected="false" data-view="range">Ticket band</button>
+    </div>
+    <a class="icon-btn repo-link" href="https://github.com/frla18cz/parlay-kelly"
+       title="Source on GitHub" aria-label="Source on GitHub" target="_blank" rel="noopener">
+      <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true" focusable="false">
+        <path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38
+        0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01
+        1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95
+        0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.42 7.42 0 0 1 2-.27c.68 0
+        1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87
+        3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/>
+      </svg>
+    </a>
+    <button class="icon-btn" id="themeToggle" title="Toggle theme" aria-label="Toggle theme">◐</button>
+  </div>
+
+  <!-- ══════════════════ PERSPECTIVE — governs both tabs ══════════════════ -->
+  <div class="perspbar">
+    <div class="perspbar-lead">
+      <span class="perspbar-q">Which side are you on?</span>
+      <span class="perspbar-note" id="perspNote">You win when the combo <strong>misses</strong>.</span>
+    </div>
+    <div class="seg persp" id="perspective" role="group" aria-label="Which side of the ticket you take">
+      <button data-v="sell" aria-pressed="true">
+        <span class="pt">I sell the combo</span>
+        <span class="ps">write it, collect the premium</span>
+      </button>
+      <button data-v="buy" aria-pressed="false">
+        <span class="pt">I buy the combo</span>
+        <span class="ps">back it, chase the payout</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════ SECTION 1 ══════════════════════════ -->
+  <section class="view active" id="view-quote">
+  <div class="layout">
+
+    <div class="panel">
+
+      <div class="card">
+        <header><h3>Bankroll</h3></header>
+        <div class="field">
+          <input type="number" id="q_bankroll" value="10000" min="1" step="100">
+        </div>
+      </div>
+
+      <div class="card">
+        <header>
+          <h3>Ticket</h3>
+          <span class="spacer"></span>
+          <label class="check"><input type="checkbox" id="q_manualProduct"> enter product directly</label>
+        </header>
+
+        <div id="q_legsWrap">
+          <div class="legs" id="q_legs"></div>
+          <div class="field" style="margin-top:9px">
+            <button class="btn secondary" id="q_addLeg" type="button">+ add leg</button>
+          </div>
+        </div>
+
+        <div class="field hidden" id="q_productWrap">
+          <label>Product of leg prices</label>
+          <input type="number" id="q_product" value="0.25" min="0.0001" max="0.9999" step="0.001">
+        </div>
+
+        <div class="quote-grid" style="margin-top:12px;padding-top:12px">
+          <div class="qi"><div class="k">Fair price (product of legs)</div><div class="v mono" id="q_productOut">0.2500</div></div>
+          <div class="qi"><div class="k">Combo hits with p</div><div class="v mono" id="q_pOut">25.00 %</div></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <header><h3>Price</h3></header>
+
+        <div class="field">
+          <label>How the price is set</label>
+          <div class="seg" id="q_priceMode">
+            <button data-v="markup" aria-pressed="true">Fixed edge %</button>
+            <button data-v="explicit" aria-pressed="false">Explicit price</button>
+          </div>
+        </div>
+
+        <div class="field" id="q_markupField">
+          <label id="q_markupLabel">Markup over fair</label>
+          <div class="row">
+            <input type="number" id="q_markup" value="4" min="0" max="500" step="0.1">
+            <input type="number" id="q_priceShow" value="0.2600" step="0.0001" disabled>
+          </div>
+          <div class="note" id="q_markupNote">left: %, right: the resulting sale price</div>
+        </div>
+
+        <div class="field hidden" id="q_priceField">
+          <label id="q_priceLabel">Sale price (what you sell it at)</label>
+          <div class="row">
+            <input type="number" id="q_price" value="0.26" min="0.0001" max="0.9999" step="0.001">
+            <input type="number" id="q_markupShow" value="4.00" step="0.01" disabled>
+          </div>
+          <div class="note" id="q_priceNote">right: the implied edge in %</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <header><h3>Advanced</h3><span class="hint">model vs. reality</span></header>
+        <div class="field">
+          <label>Shift in the true probability: <span class="mono" id="q_haircutOut">0.0 %</span></label>
+          <input type="range" id="q_haircut" min="-30" max="30" value="0" step="0.5">
+          <div class="note" id="q_haircutNote">Positive = the combo hits more often than the product of legs says. Leg prices carry a spread, so reality tends to sit below the product — but Kelly is dangerous mainly when the edge is <strong>overestimated</strong>.</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <header><h3>Sizing</h3></header>
+        <div class="field">
+          <div class="seg vertical" id="q_sizing">
+            <button data-v="kelly" aria-pressed="true">Kelly (fraction of bankroll at risk)</button>
+            <button data-v="flatPct" aria-pressed="false">Flat % of starting bankroll</button>
+            <button data-v="flatAbs" aria-pressed="false">Flat amount</button>
+          </div>
+        </div>
+        <div class="field" id="q_multField">
+          <label>Kelly multiple: <span class="mono" id="q_multOut">1.00×</span></label>
+          <input type="range" id="q_mult" min="0" max="2" value="1" step="0.05">
+          <div class="note">Past roughly 2×, growth falls to zero even when the edge is real.</div>
+        </div>
+        <div class="field hidden" id="q_flatPctField">
+          <label>Risk per ticket (% of starting bankroll)</label>
+          <input type="number" id="q_flatPct" value="2" min="0.01" max="100" step="0.1">
+        </div>
+        <div class="field hidden" id="q_flatAbsField">
+          <label>Risk per ticket (amount)</label>
+          <input type="number" id="q_flatAbs" value="200" min="1" step="10">
+        </div>
+        <div class="field">
+          <label>Cap on risk per ticket (% of bankroll)</label>
+          <input type="number" id="q_cap" value="100" min="0.1" max="100" step="0.5">
+        </div>
+        <label class="check"><input type="checkbox" id="q_round"> round to whole contracts</label>
+      </div>
+
+      <div class="card">
+        <header><h3>Simulation</h3></header>
+        <div class="row">
+          <div class="field"><label>Tickets per path</label><input type="number" id="q_tickets" value="100" min="1" max="5000" step="10"></div>
+          <div class="field"><label>Simulations</label><input type="number" id="q_sims" value="20000" min="200" max="200000" step="1000"></div>
+        </div>
+        <div class="row">
+          <div class="field"><label>Seed</label><input type="number" id="q_seed" min="0" step="1"></div>
+          <div class="field"><label>Ruin below (% of bankroll)</label><input type="number" id="q_ruin" value="1" min="0.0001" max="99" step="0.5"></div>
+        </div>
+        <label class="check"><input type="checkbox" id="q_seedLock"> lock the seed (otherwise a fresh one each run)</label>
+        <div class="runbar" style="margin-top:12px">
+          <button class="btn" id="q_run">Run simulation</button>
+          <div class="progress"><i id="q_prog"></i></div>
+        </div>
+        <div class="runstate" id="q_state" style="margin-top:7px">ready</div>
+      </div>
+
+    </div>
+
+    <div class="results" id="q_results">
+
+      <div class="quote" id="q_quoteCard">
+        <div class="hero-label">Kelly — the most of your bankroll to put at risk on this ticket</div>
+        <div class="hero mono" id="q_heroF">3.85 %</div>
+        <div class="hero-note" id="q_heroNote"></div>
+        <div class="quote-grid">
+          <div class="qi"><div class="k">Max loss (what you risk)</div><div class="v mono" id="q_maxLoss">—</div></div>
+          <div class="qi"><div class="k">Contracts</div><div class="v mono" id="q_contracts">—</div></div>
+          <div class="qi"><div class="k" id="q_premiumLabel">Premium collected</div><div class="v mono" id="q_premium">—</div></div>
+          <div class="qi"><div class="k">Total EV</div><div class="v mono" id="q_ev">—</div></div>
+          <div class="qi"><div class="k">Growth per ticket</div><div class="v mono" id="q_growth">—</div></div>
+          <div class="qi"><div class="k">Zero growth at</div><div class="v mono" id="q_k0">—</div></div>
+        </div>
+      </div>
+
+      <div id="q_callouts"></div>
+
+      <div class="kpis" id="q_kpis"></div>
+
+      <div class="chart-card">
+        <header>
+          <h3>Bankroll over time</h3>
+          <span class="hint" id="q_fanHint">percentile bands across every simulation</span>
+          <span class="spacer"></span>
+          <label class="check"><input type="checkbox" id="q_log" checked> log axis</label>
+        </header>
+        <div class="chart tall" id="q_fan"></div>
+        <div class="legend" id="q_fanLegend"></div>
+      </div>
+
+      <div class="grid-2">
+        <div class="chart-card">
+          <header><h3>Final bankroll</h3><span class="hint">distribution after every ticket</span></header>
+          <div class="chart" id="q_hist"></div>
+          <div class="legend" id="q_histLegend"></div>
+        </div>
+        <div class="chart-card">
+          <header><h3>Max drawdown</h3><span class="hint">worst fall from a running peak</span></header>
+          <div class="chart" id="q_dd"></div>
+        </div>
+      </div>
+
+      <div class="chart-card">
+        <header>
+          <h3>Where you ended up, by decile</h3>
+          <span class="hint">each band = 10 % of simulations, the tick is their midpoint</span>
+        </header>
+        <div class="chart tall" id="q_deciles"></div>
+        <div class="callout" style="margin-top:12px">
+          <span class="ico">i</span>
+          <div class="body">
+            Read this row by row: "the worst 10 % of runs finished between here and here."
+            <strong>These are not paths.</strong> In the bankroll chart the median is not one
+            particular run — it is the median across every simulation at each moment. A path
+            sitting on the median halfway through can finish anywhere.
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="chart-card">
+          <header><h3>Quantile curve</h3><span class="hint">percentile → final bankroll</span></header>
+          <div class="chart" id="q_quant"></div>
+        </div>
+        <div class="chart-card">
+          <header><h3>Growth vs. Kelly multiple</h3><span class="hint">where the optimum is, and where it stops paying</span></header>
+          <div class="chart" id="q_curve"></div>
+        </div>
+      </div>
+
+      <div class="chart-card">
+        <header>
+          <h3>Sizing comparison</h3>
+          <span class="hint">same ticket, same randomness, different stake</span>
+          <span class="spacer"></span>
+          <button class="btn secondary" id="q_cmpRun" type="button">Run comparison</button>
+        </header>
+        <div class="chart tall" id="q_cmp"></div>
+        <div class="legend" id="q_cmpLegend"></div>
+        <div class="tablewrap" id="q_cmpTable"></div>
+      </div>
+
+      <div class="card">
+        <header>
+          <h3>Trade log</h3>
+          <span class="hint">ticket by ticket from one specific path</span>
+          <span class="spacer"></span>
+          <div class="seg" id="q_logPick">
+            <button data-v="5" aria-pressed="false">p5</button>
+            <button data-v="50" aria-pressed="true">median</button>
+            <button data-v="95" aria-pressed="false">p95</button>
+          </div>
+          <button class="btn secondary" id="q_logCsv" type="button">CSV</button>
+        </header>
+        <div class="card-sub" id="q_logInfo">Run a simulation and the log fills in.</div>
+        <div class="tablewrap logwrap" id="q_tradeLog"></div>
+      </div>
+
+      <div class="chart-card">
+        <header><h3>Sensitivity to an overestimated edge</h3><span class="hint">you size from the model, reality is elsewhere</span></header>
+        <div class="chart" id="q_sens"></div>
+        <div class="legend" id="q_sensLegend"></div>
+      </div>
+
+      <div class="card">
+        <header>
+          <h3>Numbers</h3><span class="hint">the table view — everything that is in the charts</span>
+          <span class="spacer"></span>
+          <button class="btn secondary" id="q_csv" type="button">Export CSV</button>
+        </header>
+        <div class="tablewrap" id="q_table"></div>
+      </div>
+
+    </div>
+  </div>
+  </section>
+
+  <!-- ══════════════════════════ SECTION 2 ══════════════════════════ -->
+  <section class="view" id="view-range">
+  <div class="layout">
+
+    <div class="panel">
+
+      <div class="card">
+        <header><h3>Bankroll</h3></header>
+        <div class="field"><input type="number" id="r_bankroll" value="10000" min="1" step="100"></div>
+      </div>
+
+      <div class="card">
+        <header><h3>The band</h3></header>
+
+        <div class="field">
+          <label id="r_markupLabel">Your edge (markup over fair)</label>
+          <input type="number" id="r_markup" value="4" min="0.1" max="200" step="0.1">
+        </div>
+
+        <div class="field">
+          <label>Your win probability — lower edge: <span class="mono" id="r_qLoOut">0.50</span></label>
+          <input type="range" id="r_qLo" min="0.02" max="0.98" value="0.5" step="0.01">
+        </div>
+        <div class="field">
+          <label>Your win probability — upper edge: <span class="mono" id="r_qHiOut">0.90</span></label>
+          <input type="range" id="r_qHi" min="0.02" max="0.98" value="0.9" step="0.01">
+        </div>
+
+        <div class="callout" style="margin:4px 0 11px">
+          <span class="ico">↔</span>
+          <div class="body">
+            You take tickets where <strong>you</strong> win with probability
+            <strong class="mono" id="r_mirrorQ">50–90 %</strong>.<br>
+            That is a leg product of <strong class="mono" id="r_mirrorP">0.10–0.50</strong>,
+            <span id="r_mirrorCLabel">sale price</span> <span class="mono" id="r_mirrorC">0.104–0.520</span>.
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Distribution across the band</label>
+          <div class="seg" id="r_dist">
+            <button data-v="uniform" aria-pressed="true">Uniform</button>
+            <button data-v="triangular" aria-pressed="false">Triangular</button>
+          </div>
+        </div>
+        <div class="field hidden" id="r_modeField">
+          <label>Peak: <span class="mono" id="r_distModeOut">0.50</span></label>
+          <input type="range" id="r_distMode" min="0" max="1" value="0.5" step="0.05">
+          <div class="note">0 = weight on balanced tickets, 1 = on long shots</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <header><h3>Concurrency</h3><span class="hint">open at the same time</span></header>
+        <div class="field">
+          <label>Tickets running concurrently</label>
+          <input type="number" id="r_concurrent" value="1" min="1" max="50" step="1">
+        </div>
+        <label class="check"><input type="checkbox" id="r_split"> tickets share legs — split Kelly between them</label>
+        <div class="note" style="margin-top:6px">Independent tickets on different events each get full Kelly, and concurrency then does not matter. Splitting only makes sense when the tickets hang on the same legs.</div>
+      </div>
+
+      <div class="card">
+        <header><h3>Advanced</h3></header>
+        <div class="field">
+          <label>Shift in the true probability: <span class="mono" id="r_haircutOut">0.0 %</span></label>
+          <input type="range" id="r_haircut" min="-30" max="30" value="0" step="0.5">
+        </div>
+      </div>
+
+      <div class="card">
+        <header><h3>Sizing</h3></header>
+        <div class="field">
+          <div class="seg vertical" id="r_sizing">
+            <button data-v="kelly" aria-pressed="true">Kelly (fraction of bankroll at risk)</button>
+            <button data-v="flatPct" aria-pressed="false">Flat % of starting bankroll</button>
+            <button data-v="flatAbs" aria-pressed="false">Flat amount</button>
+          </div>
+        </div>
+        <div class="field" id="r_multField">
+          <label>Kelly multiple: <span class="mono" id="r_multOut">1.00×</span></label>
+          <input type="range" id="r_mult" min="0" max="2" value="1" step="0.05">
+        </div>
+        <div class="field hidden" id="r_flatPctField">
+          <label>Risk per ticket (% of starting bankroll)</label>
+          <input type="number" id="r_flatPct" value="2" min="0.01" max="100" step="0.1">
+        </div>
+        <div class="field hidden" id="r_flatAbsField">
+          <label>Risk per ticket (amount)</label>
+          <input type="number" id="r_flatAbs" value="200" min="1" step="10">
+        </div>
+        <div class="field">
+          <label>Cap on risk per ticket (% of bankroll)</label>
+          <input type="number" id="r_cap" value="100" min="0.1" max="100" step="0.5">
+        </div>
+      </div>
+
+      <div class="card">
+        <header><h3>Simulation</h3></header>
+        <div class="row">
+          <div class="field"><label>Tickets per path</label><input type="number" id="r_tickets" value="100" min="1" max="5000" step="10"></div>
+          <div class="field"><label>Simulations</label><input type="number" id="r_sims" value="20000" min="200" max="200000" step="1000"></div>
+        </div>
+        <div class="row">
+          <div class="field"><label>Seed</label><input type="number" id="r_seed" min="0" step="1"></div>
+          <div class="field"><label>Ruin below (% of bankroll)</label><input type="number" id="r_ruin" value="1" min="0.0001" max="99" step="0.5"></div>
+        </div>
+        <label class="check"><input type="checkbox" id="r_seedLock"> lock the seed (otherwise a fresh one each run)</label>
+        <div class="runbar" style="margin-top:12px">
+          <button class="btn" id="r_run">Run simulation</button>
+          <div class="progress"><i id="r_prog"></i></div>
+        </div>
+        <div class="runstate" id="r_state" style="margin-top:7px">ready</div>
+      </div>
+
+    </div>
+
+    <div class="results" id="r_results">
+
+      <div class="quote">
+        <div class="hero-label" id="r_heroLabel">Kelly per ticket — constant across the whole band at a fixed edge</div>
+        <div class="hero mono" id="r_heroF">3.85 %</div>
+        <div class="hero-note" id="r_heroNote"></div>
+        <div class="quote-grid">
+          <div class="qi"><div class="k">Growth per ticket, balanced</div><div class="v mono" id="r_gBal">—</div></div>
+          <div class="qi"><div class="k">Growth per ticket, long shots</div><div class="v mono" id="r_gFav">—</div></div>
+          <div class="qi"><div class="k">Ratio</div><div class="v mono" id="r_gRatio">—</div></div>
+          <div class="qi"><div class="k">Average across the band</div><div class="v mono" id="r_gAvg">—</div></div>
+        </div>
+      </div>
+
+      <div id="r_callouts"></div>
+
+      <div class="kpis" id="r_kpis"></div>
+
+      <div class="chart-card">
+        <header>
+          <h3>Bankroll over time</h3>
+          <span class="hint">tickets drawn at random from the band</span>
+          <span class="spacer"></span>
+          <label class="check"><input type="checkbox" id="r_log" checked> log axis</label>
+        </header>
+        <div class="chart tall" id="r_fan"></div>
+        <div class="legend" id="r_fanLegend"></div>
+      </div>
+
+      <div class="grid-2">
+        <div class="chart-card">
+          <header><h3>Growth per ticket by your win probability</h3><span class="hint">same capital at risk, different return</span></header>
+          <div class="chart" id="r_gcurve"></div>
+        </div>
+        <div class="chart-card">
+          <header><h3 id="r_mcurveTitle">Edge needed for even growth</h3><span class="hint">what to charge so every ticket earns the same</span></header>
+          <div class="chart" id="r_mcurve"></div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="chart-card">
+          <header><h3>Final bankroll</h3><span class="hint">distribution after every ticket</span></header>
+          <div class="chart" id="r_hist"></div>
+          <div class="legend" id="r_histLegend"></div>
+        </div>
+        <div class="chart-card">
+          <header><h3>Max drawdown</h3><span class="hint">worst fall from a running peak</span></header>
+          <div class="chart" id="r_dd"></div>
+        </div>
+      </div>
+
+      <div class="chart-card">
+        <header>
+          <h3>Where you ended up, by decile</h3>
+          <span class="hint">each band = 10 % of simulations, the tick is their midpoint</span>
+        </header>
+        <div class="chart tall" id="r_deciles"></div>
+      </div>
+
+      <div class="chart-card">
+        <header><h3>Quantile curve</h3><span class="hint">percentile → final bankroll</span></header>
+        <div class="chart" id="r_quant"></div>
+      </div>
+
+      <div class="chart-card">
+        <header>
+          <h3>Sizing comparison</h3>
+          <span class="hint">same band, same randomness, different stake</span>
+          <span class="spacer"></span>
+          <button class="btn secondary" id="r_cmpRun" type="button">Run comparison</button>
+        </header>
+        <div class="chart tall" id="r_cmp"></div>
+        <div class="legend" id="r_cmpLegend"></div>
+        <div class="tablewrap" id="r_cmpTable"></div>
+      </div>
+
+      <div class="card">
+        <header>
+          <h3>Trade log</h3>
+          <span class="hint">ticket by ticket from one specific path</span>
+          <span class="spacer"></span>
+          <div class="seg" id="r_logPick">
+            <button data-v="5" aria-pressed="false">p5</button>
+            <button data-v="50" aria-pressed="true">median</button>
+            <button data-v="95" aria-pressed="false">p95</button>
+          </div>
+          <button class="btn secondary" id="r_logCsv" type="button">CSV</button>
+        </header>
+        <div class="card-sub" id="r_logInfo">Run a simulation and the log fills in.</div>
+        <div class="tablewrap logwrap" id="r_tradeLog"></div>
+      </div>
+
+      <div class="card">
+        <header>
+          <h3>Numbers</h3><span class="hint">the table view</span>
+          <span class="spacer"></span>
+          <button class="btn secondary" id="r_csv" type="button">Export CSV</button>
+        </header>
+        <div class="tablewrap" id="r_table"></div>
+      </div>
+
+    </div>
+  </div>
+  </section>
+
+</div>
+
+<script src="js/kelly.js"></script>
+<script src="js/sim.js"></script>
+<script src="js/charts.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
