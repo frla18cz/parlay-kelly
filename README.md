@@ -4,7 +4,7 @@
 
 **How much of your bankroll to put on a combo ticket — whether you are buying it or writing it.**
 
-[Live demo](https://frla18cz.github.io/parlay-kelly/) &nbsp;·&nbsp; [Quickstart](#quickstart) &nbsp;·&nbsp; [The maths](#the-maths) &nbsp;·&nbsp; [Limits](#limits-and-assumptions)
+[Live demo](https://kelly.polylab.app/) &nbsp;·&nbsp; [Quickstart](#quickstart) &nbsp;·&nbsp; [The maths](#the-maths) &nbsp;·&nbsp; [Limits](#limits-and-assumptions)
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) ![Zero dependencies](https://img.shields.io/badge/dependencies-none-brightgreen.svg) ![Vanilla JS](https://img.shields.io/badge/vanilla-JS-f7df1e.svg) ![Single file build](https://img.shields.io/badge/build-single%20file-lightgrey.svg)
 
@@ -243,7 +243,20 @@ src/js/charts.js    canvas charting layer
 src/js/app.js       state and wiring
 build.py            inliner → single file
 serve.py            static server
+docs/               what the two hosts serve (built page + images)
+vercel.json         static deploy config
 ```
+
+## Hosting
+
+The live demo runs on Vercel at **<https://kelly.polylab.app>**, deployed from
+`docs/` as a static site — there is no server, no build step on the host, and
+nothing to configure beyond `vercel.json`.
+
+The same `docs/` folder is also published through GitHub Pages at
+<https://frla18cz.github.io/parlay-kelly/>, which stays up as a mirror so older
+links keep working. Both addresses serve the identical single-file page, so
+either one is safe to share.
 
 ## Licence
 
